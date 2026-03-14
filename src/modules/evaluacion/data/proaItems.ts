@@ -1,142 +1,171 @@
 export type ComplianceValue = 'SI' | 'NO' | 'NO_APLICA';
+export type ProaSectionId = 'pre' | 'exec' | 'eval';
 
-export const PROA_SECTIONS = [
+// ─── Item type ───────────────────────────────────────────────────────────────
+
+export interface ProaItem {
+  text: string;
+  requiresFile?: boolean;
+  fileLabel?: string;
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+const t = (text: string): ProaItem => ({ text });
+const f = (text: string, fileLabel: string): ProaItem => ({ text, requiresFile: true, fileLabel });
+
+// ─── Section definition type ─────────────────────────────────────────────────
+
+export interface ProaSectionDef {
+  id: ProaSectionId;
+  title: string;
+  maxScore: number;
+  categories: readonly {
+    name: string;
+    items: readonly ProaItem[];
+  }[];
+}
+
+export type ProaSection = ProaSectionDef;
+
+// ─── Data ─────────────────────────────────────────────────────────────────────
+
+export const PROA_SECTIONS: readonly ProaSectionDef[] = [
   {
-    id: 'pre' as const,
+    id: 'pre',
     title: 'Pre-implementación',
     maxScore: 28,
     categories: [
       {
         name: 'Socialización del PROA',
         items: [
-          'Socialización a directores, calidad, Talento Humano etc.',
-          'Diseño del PROA',
-          'Institucionalización PROA (Acta de conformación/ acto administrativo)',
-          'Difusión del PROA',
-        ] as const,
+          t('Socialización a directores, calidad, Talento Humano etc.'),
+          t('Diseño del PROA'),
+          f('Institucionalización PROA (Acta de conformación/ acto administrativo)', 'Subir acta de conformación'),
+          t('Difusión del PROA'),
+        ],
       },
       {
         name: 'Conformación del equipo Institucional del PROA',
         items: [
-          'Líder del equipo',
-          'Representante Administrativo de la IPS',
-          'Profesional Enfermería',
-          'Profesional Microbiología',
-          'Profesional en Química Farmacéutica y/o Regente de Farmacia',
-          'Representante de médicos',
-          'Especialista en Infectología',
-          'Profesional en Epidemiología con entrenamiento en PROA',
-          'Representantes de las diferentes especialidades clínicas',
-          'Líder de Capacitación',
-          'Otros',
-        ] as const,
+          t('Líder del equipo'),
+          t('Representante Administrativo de la IPS'),
+          t('Profesional Enfermería'),
+          t('Profesional Microbiología'),
+          t('Profesional en Química Farmacéutica y/o Regente de Farmacia'),
+          t('Representante de médicos'),
+          t('Especialista en Infectología'),
+          t('Profesional en Epidemiología con entrenamiento en PROA'),
+          t('Representantes de las diferentes especialidades clínicas'),
+          t('Líder de Capacitación'),
+          t('Otros'),
+        ],
       },
       {
         name: 'Capacidad técnica para la ejecución del PROA',
         items: [
-          'Lugar para reunión del equipo PROA, con ordenadores, programas informáticos, acceso a bibliografía y proyector',
-          'Historia clínica sistematizada - Alertas',
-          'Sistemas de soporte de decisión clínica sistematizada para formulación',
-          'Equipos con Herramienta de análisis de resistencia WHONET',
-        ] as const,
+          t('Lugar para reunión del equipo PROA, con ordenadores, programas informáticos, acceso a bibliografía y proyector'),
+          t('Historia clínica sistematizada - Alertas'),
+          t('Sistemas de soporte de decisión clínica sistematizada para formulación'),
+          t('Equipos con Herramienta de análisis de resistencia WHONET'),
+        ],
       },
       {
         name: 'Capacidad tecnológica para la ejecución del PROA',
         items: [
-          'Equipos de laboratorio para Identificación de microorganismos y perfil de susceptibilidad',
-          'Antibiogramas ajustados',
-          'Informe periódico',
-          'Test rápidos para identificación de microorganismos',
-          'Galactomannan y otras para hongos',
-          'Vancomicina (niveles)',
-          'Aminoglucósidos (niveles)',
-          'Proteína C reactiva',
-          'Procalcitonina',
-        ] as const,
+          t('Equipos de laboratorio para Identificación de microorganismos y perfil de susceptibilidad'),
+          t('Antibiogramas ajustados'),
+          f('Informe periódico', 'Subir informe periódico'),
+          t('Test rápidos para identificación de microorganismos'),
+          t('Galactomannan y otras para hongos'),
+          t('Vancomicina (niveles)'),
+          t('Aminoglucósidos (niveles)'),
+          t('Proteína C reactiva'),
+          t('Procalcitonina'),
+        ],
       },
-    ] as const,
+    ],
   },
   {
-    id: 'exec' as const,
+    id: 'exec',
     title: 'Ejecución del PROA',
     maxScore: 21,
     categories: [
       {
         name: 'Oficialización',
         items: [
-          'IVU — Guía de Práctica Clínica',
-          'Neumonía — Guía de Práctica Clínica',
-          'Piel y Tejidos Blandos — Guía de Práctica Clínica',
-          'Exacerbación EPOC — Guía de Práctica Clínica',
-          'EDA — Guía de Práctica Clínica',
-          'Profilaxis pre quirúrgica — Guía de Práctica Clínica',
-          'Otras — Guía de Práctica Clínica',
-          'Desarrollo de algoritmos de tratamiento',
-          'Implementación de Sistemas de soporte de decisión clínica',
-          'Realización de protocolos para pruebas de identificación de microorganismos',
-          'Desarrollo de estrategias de Preautorización/ documentación',
-          'Desarrollo de estrategias de Auditoría prospectivas con retroalimentación',
-        ] as const,
+          f('IVU — Guía de Práctica Clínica', 'Subir GPC de IVU'),
+          f('Neumonía — Guía de Práctica Clínica', 'Subir GPC de Neumonía'),
+          f('Piel y Tejidos Blandos — Guía de Práctica Clínica', 'Subir GPC de Piel y Tejidos Blandos'),
+          f('Exacerbación EPOC — Guía de Práctica Clínica', 'Subir GPC de EPOC'),
+          f('EDA — Guía de Práctica Clínica', 'Subir GPC de EDA'),
+          f('Profilaxis pre quirúrgica — Guía de Práctica Clínica', 'Subir GPC de Profilaxis Quirúrgica'),
+          f('Otras — Guía de Práctica Clínica', 'Subir Guía de Práctica Clínica'),
+          f('Desarrollo de algoritmos de tratamiento', 'Subir algoritmo de tratamiento'),
+          t('Implementación de Sistemas de soporte de decisión clínica'),
+          f('Realización de protocolos para pruebas de identificación de microorganismos', 'Subir protocolo'),
+          t('Desarrollo de estrategias de Preautorización/ documentación'),
+          t('Desarrollo de estrategias de Auditoría prospectivas con retroalimentación'),
+        ],
       },
       {
         name: 'Educación',
         items: [
-          'Resistencia a antimicrobianos',
-          'Diagnóstico y esquema de tratamientos institucionales',
-          'Diagnóstico y Control de las IAAS',
-          'Solicitud Pruebas de laboratorio',
-          'Interpretación de pruebas de laboratorio',
-          'Estrategias de Educación',
-        ] as const,
+          t('Resistencia a antimicrobianos'),
+          t('Diagnóstico y esquema de tratamientos institucionales'),
+          t('Diagnóstico y Control de las IAAS'),
+          t('Solicitud Pruebas de laboratorio'),
+          t('Interpretación de pruebas de laboratorio'),
+          t('Estrategias de Educación'),
+        ],
       },
       {
         name: 'Implementación',
         items: [
-          'Preautorización con seguimiento',
-          'Auditoría prospectivas con retroalimentación (alterna)',
-          'Evaluación periódica de consumo',
-        ] as const,
+          t('Preautorización con seguimiento'),
+          t('Auditoría prospectivas con retroalimentación (alterna)'),
+          t('Evaluación periódica de consumo'),
+        ],
       },
-    ] as const,
+    ],
   },
   {
-    id: 'eval' as const,
+    id: 'eval',
     title: 'Evaluación de la Ejecución',
     maxScore: 12,
     categories: [
       {
         name: 'Indicadores proceso',
         items: [
-          'Toma de muestras previo tratamiento (obligatorio)',
-          'Solicitudes de pruebas de microbiología generales, especiales y test rápidos',
-          'Adherencia a guías',
-          'Valoraciones por Infectología AB grupo 1',
-          'Valoraciones por infectología pacientes en UCI, UCIN y pacientes con Neutropenia febril',
-        ] as const,
+          t('Toma de muestras previo tratamiento (obligatorio)'),
+          t('Solicitudes de pruebas de microbiología generales, especiales y test rápidos'),
+          t('Adherencia a guías'),
+          t('Valoraciones por Infectología AB grupo 1'),
+          t('Valoraciones por infectología pacientes en UCI, UCIN y pacientes con Neutropenia febril'),
+        ],
       },
       {
         name: 'Indicadores Resultado',
         items: [
-          'DDD/DOT',
-          'Ajuste de prescripción (obligatorio)',
-          'Ajuste de prescripción en UCI, UCIN y pacientes con Neutropenia Febril',
-          'Cambios de medicamentos por Infectología',
-          'Profilaxis antibiótica perioperatoria menor 24H (obligatorio)',
-        ] as const,
+          t('DDD/DOT'),
+          t('Ajuste de prescripción (obligatorio)'),
+          t('Ajuste de prescripción en UCI, UCIN y pacientes con Neutropenia Febril'),
+          t('Cambios de medicamentos por Infectología'),
+          t('Profilaxis antibiótica perioperatoria menor 24H (obligatorio)'),
+        ],
       },
       {
         name: 'Indicadores Impacto',
         items: [
-          'IAAS por gérmenes resistentes, BLEE, AMPc, carbapenémicos (obligatorio)',
-          'Perfil institucional de Resistencia Bacteriana',
-        ] as const,
+          t('IAAS por gérmenes resistentes, BLEE, AMPc, carbapenémicos (obligatorio)'),
+          f('Perfil institucional de Resistencia Bacteriana', 'Subir perfil de resistencia'),
+        ],
       },
-    ] as const,
+    ],
   },
-] as const;
+];
 
-export type ProaSectionId = (typeof PROA_SECTIONS)[number]['id'];
-export type ProaSection = (typeof PROA_SECTIONS)[number];
+// ─── Utilities ────────────────────────────────────────────────────────────────
 
 export function getItemKey(
   sectionId: string,

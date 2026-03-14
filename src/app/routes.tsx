@@ -26,6 +26,7 @@ const Resistencias = wrap(lazy(() => import('./pages/Resistencias').then((m) => 
 const Reportes = wrap(lazy(() => import('./pages/Reportes').then((m) => ({ default: m.Reportes }))));
 const Configuracion = wrap(lazy(() => import('./pages/Configuracion').then((m) => ({ default: m.Configuracion }))));
 const Hospitales = wrap(lazy(() => import('./pages/Hospitales').then((m) => ({ default: m.Hospitales }))));
+const HospitalDashboard = wrap(lazy(() => import('./pages/HospitalDashboard').then((m) => ({ default: m.HospitalDashboard }))));
 const Comparativa = wrap(lazy(() => import('./pages/Comparativa').then((m) => ({ default: m.Comparativa }))));
 const Alertas = wrap(lazy(() => import('./pages/Alertas').then((m) => ({ default: m.Alertas }))));
 const CalculadoraDDD = wrap(lazy(() => import('./pages/CalculadoraDDD').then((m) => ({ default: m.CalculadoraDDD }))));
@@ -82,6 +83,7 @@ export const router = createBrowserRouter([
           { path: 'alertas', Component: Alertas },
           { path: 'configuracion', Component: Configuracion },
           { path: 'hospitales', Component: Hospitales },
+          { path: 'hospitales/:hospitalId/dashboard', Component: HospitalDashboard },
           { path: 'pacientes', Component: Pacientes },
           { path: 'comparativa', Component: Comparativa },
           { path: 'calculadora-ddd', Component: CalculadoraDDD },

@@ -172,7 +172,7 @@ export function generateEvaluacionPDF(params: {
       cat.items.forEach((item, itemIdx) => {
         const key = getItemKey(section.id, catIdx, itemIdx);
         const val = allItemValues[key];
-        rows.push([cat.name, item, complianceLabel(val)]);
+        rows.push([cat.name, item.text, complianceLabel(val)]);
       });
     });
 
@@ -371,7 +371,7 @@ export function exportPartialEvaluation(params: {
     section.categories.forEach((cat, catIdx) => {
       cat.items.forEach((item, itemIdx) => {
         const key = getItemKey(section.id, catIdx, itemIdx);
-        rows.push([cat.name, item, complianceLabel(allItemValues[key])]);
+        rows.push([cat.name, item.text, complianceLabel(allItemValues[key])]);
       });
     });
 

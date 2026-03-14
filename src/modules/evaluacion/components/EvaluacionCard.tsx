@@ -1,6 +1,7 @@
+import { useRef, useState } from 'react';
 import { motion } from 'motion/react';
-import { Check } from 'lucide-react';
-import type { ComplianceValue } from '../data/proaItems';
+import { Check, Upload, CheckCircle2, X } from 'lucide-react';
+import type { ComplianceValue, ProaItem } from '../data/proaItems';
 import { getItemKey } from '../data/proaItems';
 import { ProgressBar } from './ProgressBar';
 
@@ -8,7 +9,7 @@ interface EvaluacionCardProps {
   sectionId: string;
   categoryIdx: number;
   categoryName: string;
-  items: readonly string[];
+  items: readonly ProaItem[];
   allItemValues: Record<string, ComplianceValue>;
   onItemChange: (key: string, value: ComplianceValue) => void;
 }
@@ -31,6 +32,35 @@ export function EvaluacionCard({
   allItemValues,
   onItemChange,
 }: EvaluacionCardProps) {
+  const [fileNames, setFileNames] = useState<Record<string, string>>({});
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const pendingKeyRef = useRef<string>('');
+
+  function triggerUpload(key: string) {
+    pendingKeyRef.current = key;
+    fileInputRef.current?.click();
+  }
+
+  function handleFileInputChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const key = pendingKeyRef.current;
+    if (!key) return;
+    setFileNames((prev) => ({ ...prev, [key]: file.name }));
+    onItemChange(key, 'SI');
+    e.target.value = '';
+    pendingKeyRef.current = '';
+  }
+
+  function removeFile(key: string) {
+    setFileNames((prev) => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+    onItemChange(key, 'NO');
+  }
+
   const score = items.reduce((acc, _, itemIdx) => {
     const key = getItemKey(sectionId, categoryIdx, itemIdx);
     const val = allItemValues[key];
@@ -60,6 +90,15 @@ export function EvaluacionCard({
       transition={{ duration: 0.2 }}
       className="bg-white rounded-xl border border-gray-200 shadow-sm p-4"
     >
+      {/* Hidden file input shared by all file items in this card */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        className="hidden"
+        onChange={handleFileInputChange}
+        aria-hidden="true"
+      />
+
       {/* Card Header */}
       <div className="flex items-start justify-between mb-3">
         <h4 className="text-sm font-semibold text-gray-800 leading-tight flex-1 min-w-0 mr-2">
@@ -79,6 +118,64 @@ export function EvaluacionCard({
           const key = getItemKey(sectionId, categoryIdx, itemIdx);
           const currentValue = allItemValues[key];
 
+          if (item.requiresFile) {
+            const fileName = fileNames[key];
+            const hasSI = currentValue === 'SI';
+
+            return (
+              <div
+                key={key}
+                className={`py-2 rounded-r border-l-2 pl-1.5 ${
+                  currentValue === 'NO'
+                    ? 'border-red-300 bg-red-50/60'
+                    : hasSI
+                      ? 'border-green-300 bg-green-50/40'
+                      : 'border-transparent'
+                }`}
+              >
+                <span className="block text-xs text-gray-600 leading-relaxed mb-1.5">
+                  {item.text}
+                </span>
+
+                {hasSI ? (
+                  /* ── Document attached state ── */
+                  <div className="flex items-center gap-1.5 bg-green-50 border border-green-200 rounded-md px-2 py-1 min-h-[44px]">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-green-500 shrink-0" />
+                    <span className="flex-1 text-xs text-green-700 truncate">
+                      {fileName ?? 'Documento adjunto'}
+                    </span>
+                    <button
+                      onClick={() => removeFile(key)}
+                      className="shrink-0 text-gray-400 hover:text-red-500 transition-colors ml-1"
+                      title="Quitar documento"
+                      aria-label="Quitar documento adjunto"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ) : (
+                  /* ── Upload prompt state ── */
+                  <div className="space-y-1">
+                    <button
+                      onClick={() => triggerUpload(key)}
+                      className="flex items-center justify-center gap-1.5 w-full text-xs text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 border border-dashed border-indigo-300 rounded-md px-2 py-1.5 min-h-[44px] transition-colors"
+                    >
+                      <Upload className="w-3.5 h-3.5 shrink-0" />
+                      {item.fileLabel ?? 'Subir documento'}
+                    </button>
+                    <button
+                      onClick={() => onItemChange(key, 'NO')}
+                      className="w-full text-center text-xs text-gray-400 hover:text-red-500 underline py-0.5 transition-colors"
+                    >
+                      No tenemos este documento
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          }
+
+          /* ── Regular SI / NO / N/A item ── */
           return (
             <div
               key={key}
@@ -89,7 +186,7 @@ export function EvaluacionCard({
               }`}
             >
               <span className="flex-1 text-xs text-gray-600 leading-relaxed pt-0.5">
-                {item}
+                {item.text}
               </span>
               <div className="flex shrink-0 rounded-md overflow-hidden border border-gray-200">
                 {COMPLIANCE_OPTIONS.map((opt, optIdx) => (
@@ -105,7 +202,7 @@ export function EvaluacionCard({
                         ? 'border-r border-gray-200'
                         : '',
                     ].join(' ')}
-                    aria-label={`${item}: ${opt.value}`}
+                    aria-label={`${item.text}: ${opt.value}`}
                     aria-pressed={currentValue === opt.value}
                   >
                     {opt.label}

@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   ArrowLeft,
   Plus,
@@ -25,6 +25,8 @@ import type { Hospital, HospitalFile } from '../../lib/supabase/hospitals';
 import { parseInterventionFile } from '../../lib/parsers/excelParser';
 import { upsertInterventions } from '../../lib/supabase/queries/interventions';
 import { getSupabaseClient } from '../../lib/supabase/client';
+import { toast } from 'sonner';
+import { processAndSaveExcel } from '../../modules/excel/excelProcessor';
 
 const MONTH_NAMES = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -39,6 +41,12 @@ interface PendingFile {
   status: 'idle' | 'uploading' | 'done' | 'error';
   message: string;
   aiWarning?: string; // set when AI normalization was unavailable
+}
+
+interface ExcelStatus {
+  months_found: string[];
+  total_rows: number;
+  uploaded_at: string;
 }
 
 function filesInRange(
@@ -120,6 +128,19 @@ export function Hospitales() {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Excel upload for new hospital form
+  const [addExcelFile, setAddExcelFile] = useState<File | null>(null);
+  const [addExcelProcessing, setAddExcelProcessing] = useState(false);
+  const addExcelRef = useRef<HTMLInputElement>(null);
+
+  // Excel update on existing hospital cards
+  const updateExcelRef = useRef<HTMLInputElement>(null);
+  const [updateTargetId, setUpdateTargetId] = useState<string | null>(null);
+  const [updatingExcelId, setUpdatingExcelId] = useState<string | null>(null);
+
+  // Upload status per hospital card
+  const [uploadStatuses, setUploadStatuses] = useState<Record<string, ExcelStatus>>({});
+
   const openDetail = useCallback((h: Hospital) => {
     setActiveHospital(h);
     setEditName(h.name);
@@ -150,7 +171,7 @@ export function Hospitales() {
   const resetAddForm = () => {
     setAddName(''); setAddCity(''); setAddDept('');
     setAddBeds(''); setAddContactName(''); setAddContactEmail('');
-    setAddError('');
+    setAddError(''); setAddExcelFile(null);
   };
 
   const handleAddHospital = async () => {
@@ -160,7 +181,7 @@ export function Hospitales() {
     }
     setAddSaving(true);
     setAddError('');
-    const { error } = await createHospital({
+    const { data: newHospital, error } = await createHospital({
       name: addName.trim(),
       city: addCity.trim(),
       department: addDept.trim(),
@@ -173,6 +194,17 @@ export function Hospitales() {
     if (error) {
       setAddError(error.message);
     } else {
+      if (addExcelFile && newHospital?.id && user?.id) {
+        setAddExcelProcessing(true);
+        toast.info('Procesando Excel...');
+        const result = await processAndSaveExcel(newHospital.id, addExcelFile, user.id);
+        if (result.success) {
+          toast.success(`Hospital creado y Excel procesado: ${result.monthsFound.length} mes${result.monthsFound.length !== 1 ? 'es' : ''}, ${result.totalRows} registros`);
+        } else {
+          toast.error(result.error ?? 'Error al procesar el Excel');
+        }
+        setAddExcelProcessing(false);
+      }
       await refreshHospitals();
       resetAddForm();
       setShowAddForm(false);
@@ -305,6 +337,37 @@ export function Hospitales() {
     setDeleteConfirmId(null);
   };
 
+  // Fetch Excel upload status for each hospital card
+  useEffect(() => {
+    if (hospitals.length === 0) return;
+    getSupabaseClient()
+      .from('hospital_excel_uploads')
+      .select('hospital_id, months_found, total_rows, uploaded_at')
+      .in('hospital_id', hospitals.map((h) => h.id))
+      .then(({ data }) => {
+        if (!data) return;
+        const map: Record<string, ExcelStatus> = {};
+        for (const u of (data as Array<{ hospital_id: string; months_found: string[]; total_rows: number; uploaded_at: string }>)) {
+          map[u.hospital_id] = { months_found: u.months_found, total_rows: u.total_rows, uploaded_at: u.uploaded_at };
+        }
+        setUploadStatuses(map);
+      });
+  }, [hospitals]);
+
+  const handleUpdateExcel = async (file: File, hospitalId: string) => {
+    if (!user?.id) return;
+    setUpdatingExcelId(hospitalId);
+    toast.info('Procesando Excel...');
+    const result = await processAndSaveExcel(hospitalId, file, user.id);
+    if (result.success) {
+      toast.success(`Excel actualizado: ${result.monthsFound.length} mes${result.monthsFound.length !== 1 ? 'es' : ''}, ${result.totalRows} registros`);
+    } else {
+      toast.error(result.error ?? 'Error al procesar el Excel');
+    }
+    setUpdatingExcelId(null);
+    setUpdateTargetId(null);
+  };
+
   // ─────────────────────────────────────────────────────────────────────────
   // RENDER: VIEW A — Hospital list
   // ─────────────────────────────────────────────────────────────────────────
@@ -397,14 +460,37 @@ export function Hospitales() {
                 />
               </div>
             </div>
+
+            {/* Optional Excel upload */}
+            <div
+              className={`mt-4 border-2 border-dashed rounded-xl p-5 text-center cursor-pointer transition-colors ${
+                addExcelFile ? 'border-indigo-400 bg-indigo-50' : 'border-gray-200 hover:border-indigo-300 hover:bg-gray-50'
+              }`}
+              onClick={() => addExcelRef.current?.click()}
+            >
+              <FileSpreadsheet className={`w-7 h-7 mx-auto mb-1.5 ${addExcelFile ? 'text-indigo-500' : 'text-gray-300'}`} />
+              <p className="text-sm font-medium text-gray-700">
+                {addExcelFile ? addExcelFile.name : 'Subir Excel con datos históricos (opcional)'}
+              </p>
+              <p className="text-xs text-gray-400 mt-0.5">.xlsx, .xls — puede contener múltiples meses</p>
+              <input
+                ref={addExcelRef}
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                className="hidden"
+                onChange={(e) => setAddExcelFile(e.target.files?.[0] ?? null)}
+              />
+            </div>
+
             <div className="flex items-center space-x-3 mt-4">
               <button
                 onClick={handleAddHospital}
-                disabled={addSaving}
-                className="px-4 py-2 text-sm font-medium text-white rounded-lg disabled:opacity-50"
+                disabled={addSaving || addExcelProcessing}
+                className="px-4 py-2 text-sm font-medium text-white rounded-lg disabled:opacity-50 flex items-center gap-2"
                 style={{ backgroundColor: '#0F8B8D' }}
               >
-                {addSaving ? 'Guardando...' : 'Crear hospital'}
+                {(addSaving || addExcelProcessing) && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                {addSaving ? 'Guardando...' : addExcelProcessing ? 'Procesando Excel...' : 'Crear hospital'}
               </button>
               <button
                 onClick={() => { setShowAddForm(false); resetAddForm(); }}
@@ -454,12 +540,33 @@ export function Hospitales() {
                   <p className="text-xs text-gray-500 mb-1">{h.beds} camas</p>
                 )}
 
+                {/* Excel status badge */}
+                {uploadStatuses[h.id] ? (
+                  <div className="flex items-center gap-1.5 mt-1">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-50 text-green-700 text-xs font-medium rounded-full border border-green-200">
+                      ✓ Excel cargado · {uploadStatuses[h.id].months_found.length} mes{uploadStatuses[h.id].months_found.length !== 1 ? 'es' : ''}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1.5 mt-1">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 text-amber-700 text-xs font-medium rounded-full border border-amber-200">
+                      Sin datos Excel
+                    </span>
+                  </div>
+                )}
+
                 <div className="mt-auto pt-4 flex flex-col sm:flex-row gap-2">
+                  {/* Actualizar Excel */}
                   <button
-                    onClick={() => {
-                      setSelectedHospitalObj(h);
-                      navigate('/');
-                    }}
+                    onClick={() => { setUpdateTargetId(h.id); updateExcelRef.current?.click(); }}
+                    disabled={updatingExcelId === h.id}
+                    className="w-full sm:flex-1 flex items-center justify-center space-x-1 px-3 py-2 text-xs font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+                  >
+                    {updatingExcelId === h.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+                    <span>{updatingExcelId === h.id ? 'Procesando...' : 'Subir Excel'}</span>
+                  </button>
+                  <button
+                    onClick={() => navigate(`/hospitales/${h.id}/dashboard`)}
                     className="w-full sm:flex-1 flex items-center justify-center space-x-1 px-3 py-2 text-xs font-medium text-white rounded-lg transition-colors"
                     style={{ backgroundColor: '#0F8B8D' }}
                   >
@@ -478,6 +585,19 @@ export function Hospitales() {
             ))}
           </div>
         )}
+
+      {/* Hidden input for updating Excel on existing hospital cards */}
+      <input
+        ref={updateExcelRef}
+        type="file"
+        accept=".xlsx,.xls,.csv"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file && updateTargetId) handleUpdateExcel(file, updateTargetId);
+          e.target.value = '';
+        }}
+      />
       </div>
     );
   }

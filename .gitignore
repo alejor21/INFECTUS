@@ -36,3 +36,8 @@ Thumbs.db
 
 # Coverage
 coverage/
+# Archivos temporales del agente
+tmpClaude-*
+tmp-*
+.tmp/
+*.cwd
