@@ -41,3 +41,7 @@ tmpClaude-*
 tmp-*
 .tmp/
 *.cwd
+# Archivos internos del agente
+ATTRIBUTIONS.md
+Agent.md
+INTEGRATION_NOTES.md
