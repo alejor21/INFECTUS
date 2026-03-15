@@ -17,6 +17,7 @@ import {
 import { useAuth } from '../../contexts/AuthContext';
 import { useHospitalContext } from '../../contexts/HospitalContext';
 import { getSupabaseClient } from '../../lib/supabase/client';
+import { WelcomeModal, shouldShowWelcome } from '../components/WelcomeModal';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -145,6 +146,15 @@ export function Dashboard() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [dataLoading, setDataLoading] = useState(false);
   const [modulesOpen, setModulesOpen] = useState(false);
+  const [showWelcome, setShowWelcome] = useState(false);
+
+  // Show welcome modal only once per user — never again after dismissed
+  useEffect(() => {
+    const id = profile?.id;
+    if (id && shouldShowWelcome(id)) {
+      setShowWelcome(true);
+    }
+  }, [profile?.id]);
 
   const loadStats = useCallback(async (hospitalId: string) => {
     setDataLoading(true);
@@ -237,6 +247,14 @@ export function Dashboard() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-8">
+
+      {/* Welcome modal — shown only on first login, never again */}
+      {showWelcome && profile?.id && (
+        <WelcomeModal
+          userId={profile.id}
+          onDismiss={() => setShowWelcome(false)}
+        />
+      )}
 
       {/* ─── SECTION 1 — WELCOME BANNER ────────────────────────────────────── */}
       <div>
