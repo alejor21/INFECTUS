@@ -1,6 +1,6 @@
 import { Suspense, lazy } from 'react';
 import type { LazyExoticComponent, ComponentType } from 'react';
-import { createBrowserRouter } from 'react-router';
+import { createBrowserRouter, Navigate } from 'react-router';
 import { Layout } from './components/Layout';
 import { ProtectedRoute, LoginRoute } from './components/ProtectedRoute';
 import { EvaluacionLayout } from '../modules/evaluacion/components/EvaluacionLayout';
@@ -56,7 +56,9 @@ export const router = createBrowserRouter([
     Component: ProtectedRoute,
     children: [
       // Standalone routes — no Layout wrapper
-      { index: true, Component: Launcher },
+      { index: true, element: <Navigate to="/dashboard" replace /> },
+      // Launcher — standalone full-page, no sidebar/header wrapper
+      { path: 'launcher', Component: Launcher },
       // Evaluacion section — persistent shell with sidebar + hospital selector
       {
         path: 'evaluacion',

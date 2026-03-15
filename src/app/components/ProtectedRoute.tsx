@@ -14,6 +14,6 @@ export function ProtectedRoute() {
 export function LoginRoute() {
   const { user, loading } = useAuth();
   if (loading) return <PageLoader />;
-  if (user) return <Navigate to="/" replace />;
+  if (user) return <Navigate to="/dashboard" replace />;
   return <Login />;
 }
