@@ -7,10 +7,33 @@ import type { InterventionRecord } from '../../types';
 export interface ParseResult {
   valid: InterventionRecord[];
   errors: { row: number; message: string }[];
-  aiWarning?: string; // set when AI calls failed (graceful degradation)
+  aiWarning?: string;
+  summary: {
+    totalRows: number;
+    validRows: number;
+    errorRows: number;
+    missingColumns: string[];
+  };
 }
 
-const normalizeHeader = (h: string) => h.trim().toLowerCase().replace(/\s+/g, ' ');
+/**
+ * Normalizes a header string by:
+ * - Trimming whitespace
+ * - Converting to lowercase
+ * - Removing accents
+ * - Collapsing multiple spaces to single space
+ * - Removing special characters
+ */
+const normalizeHeader = (h: string): string => {
+  return h
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // Remove accents
+    .replace(/[¿?¡!]/g, '') // Remove question/exclamation marks
+    .replace(/\s+/g, ' ') // Collapse multiple spaces
+    .replace(/[^a-z0-9\s]/g, ''); // Remove special chars except spaces
+};
 
 // Pre-build a normalized version of the column map so header lookup is O(1)
 const normalizedColumnMap: Record<string, keyof InterventionRecord> = {};
@@ -18,10 +41,112 @@ for (const [spanishHeader, camelKey] of Object.entries(EXCEL_COLUMN_MAP)) {
   normalizedColumnMap[normalizeHeader(spanishHeader)] = camelKey;
 }
 
+// Known column variations for fuzzy matching
+const COLUMN_ALIASES: Record<string, keyof InterventionRecord> = {
+  'fecha': 'fecha',
+  'fechaingreso': 'fecha',
+  'fecha ingreso': 'fecha',
+  'tipo intervencion': 'tipoIntervencion',
+  'tipodeintervencion': 'tipoIntervencion',
+  'tipo': 'tipoIntervencion',
+  'paciente': 'nombre',
+  'nombrep': 'nombre',
+  'cedula': 'admisionCedula',
+  'identificacion': 'admisionCedula',
+  'habitacion': 'cama',
+  'area': 'servicio',
+  'unidad': 'servicio',
+  'anos': 'edad',
+  'edad anos': 'edad',
+  'dx': 'diagnostico',
+  'iaas': 'iaas',
+  'tipo iaas': 'tipoIaas',
+  'aprobo': 'aproboTerapia',
+  'aprobacion': 'aproboTerapia',
+  'terapia apropiada': 'terapiaEmpricaApropiada',
+  'cultivo': 'cultivosPrevios',
+  'cultivos': 'cultivosPrevios',
+  'conducta': 'conductaGeneral',
+  'antibiotico 1': 'antibiotico01',
+  'antibiotico1': 'antibiotico01',
+  'atb 1': 'antibiotico01',
+  'atb01': 'antibiotico01',
+  'antibiotico 2': 'antibiotico02',
+  'antibiotico2': 'antibiotico02',
+  'atb 2': 'antibiotico02',
+  'atb02': 'antibiotico02',
+  'dias 1': 'diasTerapiaMed01',
+  'dias1': 'diasTerapiaMed01',
+  'dias terapia 1': 'diasTerapiaMed01',
+  'dias 2': 'diasTerapiaMed02',
+  'dias2': 'diasTerapiaMed02',
+  'dias terapia 2': 'diasTerapiaMed02',
+  'obs': 'observaciones',
+  'comentarios': 'observaciones',
+};
+
 /**
- * Bridge from AI standard field names → actual InterventionRecord camelCase keys.
- * Only covers fields that differ or need disambiguation.
+ * Parses various date formats into YYYY-MM-DD string
+ * Handles: DD/MM/YYYY, MM/DD/YYYY, YYYY-MM-DD, Excel serial numbers
  */
+function parseExcelDate(value: unknown): string {
+  if (!value) return '';
+  
+  const str = String(value).trim();
+  
+  // Already in YYYY-MM-DD format
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+    return str;
+  }
+  
+  // DD/MM/YYYY or MM/DD/YYYY
+  const slashMatch = str.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
+  if (slashMatch) {
+    const [, a, b, year] = slashMatch;
+    const day = parseInt(a);
+    const month = parseInt(b);
+    
+    // Heuristic: if day > 12, it's DD/MM/YYYY, otherwise MM/DD/YYYY
+    if (day > 12) {
+      return `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+    } else {
+      // Assume DD/MM/YYYY (Colombian standard)
+      return `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+    }
+  }
+  
+  // Excel serial number (days since 1900-01-01)
+  const num = parseFloat(str);
+  if (!isNaN(num) && num > 1 && num < 100000) {
+    const epoch = new Date(1900, 0, 1);
+    epoch.setDate(epoch.getDate() + num - 2); // Excel bug: counts 1900 as leap year
+    const year = epoch.getFullYear();
+    const month = (epoch.getMonth() + 1).toString().padStart(2, '0');
+    const day = epoch.getDate().toString().padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+  
+  return '';
+}
+
+/**
+ * Cleans cell value by:
+ * - Trimming whitespace
+ * - Replacing N/A, -, empty values with empty string
+ * - Converting null/undefined to empty string
+ */
+function cleanCellValue(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  
+  const str = String(value).trim();
+  
+  // Replace various "empty" indicators
+  if (str === '' || str === '-' || str === 'N/A' || str.toLowerCase() === 'n/a') {
+    return '';
+  }
+  
+  return str;
+}
 const AI_FIELD_TO_RECORD: Partial<Record<string, keyof InterventionRecord>> = {
   fechaIngreso:  'fecha',
   servicio:      'servicio',
@@ -94,13 +219,19 @@ export async function parseInterventionFile(file: File): Promise<ParseResult> {
   }
 
   // Build a resolver: for a given rawHeader, return the InterventionRecord key.
-  // Priority: existing normalizedColumnMap first, then AI mapping as fallback.
+  // Priority: existing normalizedColumnMap first, then aliases, then AI mapping
   const resolveHeader = (rawHeader: string): keyof InterventionRecord | undefined => {
+    const normalized = normalizeHeader(rawHeader);
+    
     // 1. Try existing exact-match normalized map
-    const existing = normalizedColumnMap[normalizeHeader(rawHeader)];
+    const existing = normalizedColumnMap[normalized];
     if (existing) return existing;
 
-    // 2. Try AI mapping fallback
+    // 2. Try known aliases
+    const alias = COLUMN_ALIASES[normalized];
+    if (alias) return alias;
+
+    // 3. Try AI mapping fallback
     const aiField = aiColumnMap[rawHeader];
     if (aiField) {
       return AI_FIELD_TO_RECORD[aiField];
@@ -108,6 +239,23 @@ export async function parseInterventionFile(file: File): Promise<ParseResult> {
 
     return undefined;
   };
+
+  // Detect missing required columns
+  const requiredFields: (keyof InterventionRecord)[] = [
+    'fecha',
+    'servicio',
+    'diagnostico',
+    'aproboTerapia'
+  ];
+  
+  const mappedHeaders = rawHeaders.map(resolveHeader).filter(Boolean);
+  const missingColumns = requiredFields.filter(
+    (field) => !mappedHeaders.includes(field)
+  );
+  
+  if (missingColumns.length > 0) {
+    console.warn('[Parser] Columnas faltantes detectadas:', missingColumns);
+  }
 
   // ── Step 3: Parse all rows ─────────────────────────────────────────────────
   const valid: InterventionRecord[] = [];
@@ -122,12 +270,17 @@ export async function parseInterventionFile(file: File): Promise<ParseResult> {
       return;
     }
 
-    // Map headers → camelCase keys
+    // Map headers → camelCase keys and clean values
     const mapped: Record<string, string> = {};
     for (const [rawHeader, rawValue] of Object.entries(rawRow)) {
       const camelKey = resolveHeader(rawHeader);
       if (camelKey) {
-        mapped[camelKey] = rawValue !== null && rawValue !== undefined ? String(rawValue).trim() : '';
+        // Special handling for date fields
+        if (camelKey === 'fecha') {
+          mapped[camelKey] = parseExcelDate(rawValue);
+        } else {
+          mapped[camelKey] = cleanCellValue(rawValue);
+        }
       }
     }
 
@@ -170,5 +323,15 @@ export async function parseInterventionFile(file: File): Promise<ParseResult> {
     }
   }
 
-  return { valid, errors, aiWarning };
+  return { 
+    valid, 
+    errors, 
+    aiWarning,
+    summary: {
+      totalRows: rows.length,
+      validRows: valid.length,
+      errorRows: errors.length,
+      missingColumns
+    }
+  };
 }

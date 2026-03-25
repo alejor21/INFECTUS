@@ -49,24 +49,34 @@ function isYes(value: string): boolean {
 /**
  * Average total therapy days per record, expressed as a percentage.
  * Formula: (sum of diasTerapiaMed01 + diasTerapiaMed02) / records.length * 100
+ * Returns 0 if no records or invalid data
  */
 export function calcAntibioticUseRate(records: InterventionRecord[]): number {
   if (records.length === 0) return 0;
   const totalDays = records.reduce((acc, r) => {
     const d1 = parseFloat(r.diasTerapiaMed01) || 0;
     const d2 = parseFloat(r.diasTerapiaMed02) || 0;
-    return acc + d1 + d2;
+    // Validate that parsed values are finite numbers
+    const days1 = Number.isFinite(d1) ? d1 : 0;
+    const days2 = Number.isFinite(d2) ? d2 : 0;
+    return acc + days1 + days2;
   }, 0);
-  return Math.round((totalDays / records.length) * 10000) / 100;
+  
+  if (!Number.isFinite(totalDays) || totalDays < 0) return 0;
+  
+  const rate = (totalDays / records.length) * 100;
+  return Number.isFinite(rate) ? Math.round(rate * 100) / 100 : 0;
 }
 
 /**
  * Percentage of records where aproboTerapia === 'SI' (case-insensitive).
+ * Returns 0 if no records
  */
 export function calcTherapeuticAdequacy(records: InterventionRecord[]): number {
   if (records.length === 0) return 0;
-  const approved = records.filter((r) => isYes(r.aproboTerapia)).length;
-  return Math.round((approved / records.length) * 10000) / 100;
+  const approved = records.filter((r) => isYes(r.aproboTerapia ?? '')).length;
+  const rate = (approved / records.length) * 100;
+  return Number.isFinite(rate) ? Math.round(rate * 100) / 100 : 0;
 }
 
 /**
@@ -84,11 +94,13 @@ export function calcIAASRate(
 
 /**
  * Percentage of records where terapiaEmpricaApropiada === 'SI' (case-insensitive).
+ * Returns 0 if no records
  */
 export function calcGuidelineCompliance(records: InterventionRecord[]): number {
   if (records.length === 0) return 0;
-  const compliant = records.filter((r) => isYes(r.terapiaEmpricaApropiada)).length;
-  return Math.round((compliant / records.length) * 10000) / 100;
+  const compliant = records.filter((r) => isYes(r.terapiaEmpricaApropiada ?? '')).length;
+  const rate = (compliant / records.length) * 100;
+  return Number.isFinite(rate) ? Math.round(rate * 100) / 100 : 0;
 }
 
 /**
@@ -116,7 +128,7 @@ export function calcTop5Antibiotics(
 
 /**
  * Total therapy days (diasTerapiaMed01 + diasTerapiaMed02) grouped by month,
- * sorted chronologically.
+ * sorted chronologically. Returns empty array if no valid dates found.
  */
 export function calcMonthlyConsumption(
   records: InterventionRecord[],
@@ -124,24 +136,29 @@ export function calcMonthlyConsumption(
   const grouped = new Map<string, { ddd: number; sortKey: number }>();
 
   for (const r of records) {
-    const date = parseDate(r.fecha);
+    const date = parseDate(r.fecha ?? '');
     if (!date) continue;
 
     const { label, sortKey } = toMonthInfo(date);
-    const d1 = parseFloat(r.diasTerapiaMed01) || 0;
-    const d2 = parseFloat(r.diasTerapiaMed02) || 0;
+    const d1 = parseFloat(r.diasTerapiaMed01 ?? '') || 0;
+    const d2 = parseFloat(r.diasTerapiaMed02 ?? '') || 0;
+    const days1 = Number.isFinite(d1) ? d1 : 0;
+    const days2 = Number.isFinite(d2) ? d2 : 0;
 
     const entry = grouped.get(label);
     if (entry) {
-      entry.ddd += d1 + d2;
+      entry.ddd += days1 + days2;
     } else {
-      grouped.set(label, { ddd: d1 + d2, sortKey });
+      grouped.set(label, { ddd: days1 + days2, sortKey });
     }
   }
 
   return Array.from(grouped.entries())
     .sort((a, b) => a[1].sortKey - b[1].sortKey)
-    .map(([month, { ddd }]) => ({ month, ddd: Math.round(ddd * 100) / 100 }));
+    .map(([month, { ddd }]) => ({ 
+      month, 
+      ddd: Number.isFinite(ddd) ? Math.round(ddd * 100) / 100 : 0 
+    }));
 }
 
 /**
@@ -221,9 +238,139 @@ export function calcMonthlyCompliance(
     }));
 }
 
-// ---------------------------------------------------------------------------
-// Resistance / microbiology analytics
-// ---------------------------------------------------------------------------
+/**
+ * Percentage of records where cultivosPrevios === 'SI' (case-insensitive).
+ * Returns 0 if no records
+ */
+export function calcCultivosPreRate(records: InterventionRecord[]): number {
+  if (records.length === 0) return 0;
+  const withCultivos = records.filter((r) => isYes(r.cultivosPrevios ?? '')).length;
+  const rate = (withCultivos / records.length) * 100;
+  return Number.isFinite(rate) ? Math.round(rate * 100) / 100 : 0;
+}
+
+/**
+ * Distribution of records by servicio (service/ward), sorted descending by count.
+ * Empty values are excluded.
+ */
+export function calcServicioDistribution(
+  records: InterventionRecord[],
+): { servicio: string; count: number }[] {
+  const freq = new Map<string, number>();
+
+  for (const r of records) {
+    const servicio = (r.servicio ?? '').trim();
+    if (!servicio) continue;
+    freq.set(servicio, (freq.get(servicio) ?? 0) + 1);
+  }
+
+  return Array.from(freq.entries())
+    .map(([servicio, count]) => ({ servicio, count }))
+    .sort((a, b) => b.count - a.count);
+}
+
+/**
+ * Distribution of records by diagnostico (top 10), sorted descending by count.
+ * Empty values are excluded.
+ */
+export function calcDiagnosticoDistribution(
+  records: InterventionRecord[],
+  limit = 10,
+): { diagnostico: string; count: number }[] {
+  const freq = new Map<string, number>();
+
+  for (const r of records) {
+    const diagnostico = (r.diagnostico ?? '').trim();
+    if (!diagnostico) continue;
+    freq.set(diagnostico, (freq.get(diagnostico) ?? 0) + 1);
+  }
+
+  return Array.from(freq.entries())
+    .map(([diagnostico, count]) => ({ diagnostico, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, limit);
+}
+
+/**
+ * Distribution of records by tipoIntervencion, sorted descending by count.
+ * Empty values are excluded.
+ */
+export function calcTipoIntervencionDistribution(
+  records: InterventionRecord[],
+): { tipo: string; count: number }[] {
+  const freq = new Map<string, number>();
+
+  for (const r of records) {
+    const tipo = (r.tipoIntervencion ?? '').trim();
+    if (!tipo) continue;
+    freq.set(tipo, (freq.get(tipo) ?? 0) + 1);
+  }
+
+  return Array.from(freq.entries())
+    .map(([tipo, count]) => ({ tipo, count }))
+    .sort((a, b) => b.count - a.count);
+}
+
+/**
+ * Average therapy days across all records with therapy days data.
+ * Returns 0 if no records have therapy days.
+ */
+export function calcAvgTherapyDays(records: InterventionRecord[]): number {
+  let totalDays = 0;
+  let count = 0;
+
+  for (const r of records) {
+    const d1 = parseFloat(r.diasTerapiaMed01 ?? '') || 0;
+    const d2 = parseFloat(r.diasTerapiaMed02 ?? '') || 0;
+    const days1 = Number.isFinite(d1) ? d1 : 0;
+    const days2 = Number.isFinite(d2) ? d2 : 0;
+    const total = days1 + days2;
+    
+    if (total > 0) {
+      totalDays += total;
+      count++;
+    }
+  }
+
+  if (count === 0) return 0;
+  const avg = totalDays / count;
+  return Number.isFinite(avg) ? Math.round(avg * 100) / 100 : 0;
+}
+
+/**
+ * Counts of approved vs rejected therapy by servicio.
+ * Returns array sorted descending by total count.
+ */
+export function calcApprovalByServicio(
+  records: InterventionRecord[],
+): { servicio: string; aprobadas: number; rechazadas: number; total: number }[] {
+  const map = new Map<string, { aprobadas: number; rechazadas: number }>();
+
+  for (const r of records) {
+    const servicio = (r.servicio ?? '').trim();
+    if (!servicio) continue;
+
+    if (!map.has(servicio)) {
+      map.set(servicio, { aprobadas: 0, rechazadas: 0 });
+    }
+
+    const entry = map.get(servicio)!;
+    if (isYes(r.aproboTerapia ?? '')) {
+      entry.aprobadas++;
+    } else if ((r.aproboTerapia ?? '').trim().toUpperCase() === 'NO') {
+      entry.rechazadas++;
+    }
+  }
+
+  return Array.from(map.entries())
+    .map(([servicio, { aprobadas, rechazadas }]) => ({
+      servicio,
+      aprobadas,
+      rechazadas,
+      total: aprobadas + rechazadas,
+    }))
+    .sort((a, b) => b.total - a.total);
+}
 
 /** Returns positive-culture records as the denominator for resistance rates. */
 function positiveCultureRecords(records: InterventionRecord[]): InterventionRecord[] {

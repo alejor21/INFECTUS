@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { parseInterventionFile } from '../lib/parsers/excelParser';
+import { parseInterventionFile, type ParseResult } from '../lib/parsers/excelParser';
 import { upsertInterventions } from '../lib/supabase/queries/interventions';
 import type { UploadResult } from '../types';
 
@@ -9,25 +9,28 @@ export interface UseFileUploadReturn {
   uploadFile: (file: File, hospitalName: string) => Promise<UploadResult>;
   status: UploadStatus;
   result: UploadResult | null;
+  parseResult: ParseResult | null;
   error: string | null;
 }
 
 export function useFileUpload(): UseFileUploadReturn {
   const [status, setStatus] = useState<UploadStatus>('idle');
   const [result, setResult] = useState<UploadResult | null>(null);
+  const [parseResult, setParseResult] = useState<ParseResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const uploadFile = useCallback(
     async (file: File, hospitalName: string): Promise<UploadResult> => {
-      console.log('[useFileUpload] uploadFile called', { fileName: file.name, hospitalName });
       setStatus('parsing');
       setResult(null);
+      setParseResult(null);
       setError(null);
 
       // 1. Parse the file
-      let parseResult;
+      let parsed: ParseResult;
       try {
-        parseResult = await parseInterventionFile(file);
+        parsed = await parseInterventionFile(file);
+        setParseResult(parsed);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         setError(msg);
@@ -37,8 +40,16 @@ export function useFileUpload(): UseFileUploadReturn {
         return failResult;
       }
 
-      const { valid, errors: parseErrors } = parseResult;
-      console.log('[useFileUpload] parse result', { valid: valid.length, errors: parseErrors.length });
+      const { valid, errors: parseErrors, summary } = parsed;
+
+      // Show summary in console for debugging
+      // eslint-disable-next-line no-console
+      console.info('[Excel Import] Resumen:', {
+        totalFilas: summary.totalRows,
+        filasValidas: summary.validRows,
+        errores: summary.errorRows,
+        columnasFaltantes: summary.missingColumns
+      });
 
       // If nothing is valid, short-circuit
       if (valid.length === 0) {
@@ -80,5 +91,5 @@ export function useFileUpload(): UseFileUploadReturn {
     [],
   );
 
-  return { uploadFile, status, result, error };
+  return { uploadFile, status, result, parseResult, error };
 }

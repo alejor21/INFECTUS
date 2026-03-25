@@ -143,22 +143,40 @@ export function HospitalProvider({ children }: { children: React.ReactNode }) {
 
   // Load hospitals on mount
   useEffect(() => {
-    refreshHospitals();
-  }, [refreshHospitals]);
+    let isMounted = true;
+    refreshHospitals().then(() => {
+      if (!isMounted) return;
+    });
+    return () => { isMounted = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Load all records on mount
   useEffect(() => {
-    refreshRecords();
-  }, [refreshRecords]);
+    let isMounted = true;
+    refreshRecords().then(() => {
+      if (!isMounted) return;
+    });
+    return () => { isMounted = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Reload files when selected hospital changes
   useEffect(() => {
-    refreshFiles();
-  }, [refreshFiles]);
+    let isMounted = true;
+    refreshFiles().then(() => {
+      if (!isMounted) return;
+    });
+    return () => { isMounted = false; };
+  }, [selectedHospitalObj, refreshFiles]);
 
   // Refresh records when a file upload completes
   useEffect(() => {
-    const handler = () => { refreshRecords(); };
+    const handler = () => { 
+      refreshRecords().catch(() => {
+        // Silent fail - already handled in refreshRecords
+      });
+    };
     window.addEventListener('infectus:data-updated', handler);
     return () => { window.removeEventListener('infectus:data-updated', handler); };
   }, [refreshRecords]);
