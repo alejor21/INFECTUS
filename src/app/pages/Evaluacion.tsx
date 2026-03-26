@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   ClipboardCheck,
@@ -16,6 +16,8 @@ import {
   Check,
   Cloud,
   FileEdit,
+  Search,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
@@ -47,6 +49,7 @@ import type { ComplianceValueDB } from '../../modules/evaluacion/types';
 
 type ViewMode = 'list' | 'board' | 'comparativa';
 type AutoSaveStatus = 'idle' | 'saving' | 'saved';
+type ProgressTone = 'indigo' | 'amber' | 'teal';
 
 const LEVEL_CONFIG = {
   avanzado: { label: 'Avanzado', className: 'bg-green-100 text-green-700 border-green-200' },
@@ -55,6 +58,7 @@ const LEVEL_CONFIG = {
 };
 
 const TOTAL_ITEMS = 61;
+const PROGRESS_SEGMENTS = 20;
 
 function formatDate(dateStr: string): string {
   const d = new Date(dateStr + 'T00:00:00');
@@ -92,6 +96,49 @@ function countAnsweredItems(allItemValues: Record<string, ComplianceValue>): num
   return count;
 }
 
+function normalizeText(value: string | null | undefined): string {
+  return (value ?? '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
+
+function getProgressSegmentClassName(active: boolean, tone: ProgressTone): string {
+  if (!active) {
+    return 'bg-gray-200';
+  }
+
+  switch (tone) {
+    case 'amber':
+      return 'bg-amber-500';
+    case 'teal':
+      return 'bg-teal-500';
+    default:
+      return 'bg-indigo-500';
+  }
+}
+
+interface SegmentedProgressBarProps {
+  value: number;
+  tone?: ProgressTone;
+}
+
+function SegmentedProgressBar({ value, tone = 'indigo' }: SegmentedProgressBarProps) {
+  const clampedValue = Math.max(0, Math.min(100, Math.round(value)));
+  const filledSegments = Math.round((clampedValue / 100) * PROGRESS_SEGMENTS);
+
+  return (
+    <div className="grid grid-cols-[repeat(20,minmax(0,1fr))] gap-1">
+      {Array.from({ length: PROGRESS_SEGMENTS }, (_, index) => (
+        <div
+          key={`progress-segment-${tone}-${index}`}
+          className={`h-2 rounded-full ${getProgressSegmentClassName(index < filledSegments, tone)}`}
+        />
+      ))}
+    </div>
+  );
+}
+
 export function Evaluacion() {
   const { profile } = useAuth();
   const navigate = useNavigate();
@@ -111,6 +158,7 @@ export function Evaluacion() {
   // Draft / autosave
   const {
     borradores,
+    loading: draftsLoading,
     createDraft,
     deleteDraft,
     completarEvaluacion,
@@ -130,6 +178,8 @@ export function Evaluacion() {
   useEffect(() => {
     if (!selectedHospitalId) {
       setEvaluations([]);
+      setAllItemValues({});
+      setObservations('');
       return;
     }
     setIsLoading(true);
@@ -140,6 +190,8 @@ export function Evaluacion() {
     setEditingEvalId(null);
     setConfirmDeleteId(null);
     setDraftEvalId(null);
+    setAllItemValues({});
+    setObservations('');
   }, [selectedHospitalId]);
 
   // Auto-save effect (debounced 800ms)
@@ -243,7 +295,7 @@ export function Evaluacion() {
     try {
       const respuestas = await loadRespuestas(draft.id);
       setAllItemValues(respuestas as Record<string, ComplianceValue>);
-      setObservations('');
+      setObservations(draft.observations ?? '');
       setEditingEvalId(null);
       setDraftEvalId(draft.id);
       setAutoSaveStatus('idle');
@@ -317,6 +369,8 @@ export function Evaluacion() {
           progressPct,
         );
         localStorage.setItem(`draft-evaluacion-${selectedHospital.id}`, draftEvalId);
+        setAllItemValues({});
+        setObservations('');
         toast.success('Evaluación guardada como borrador');
         setDraftEvalId(null);
         setViewMode('list');
@@ -380,6 +434,8 @@ export function Evaluacion() {
 
       const updated = await getEvaluations(selectedHospital.id);
       setEvaluations(updated);
+      setAllItemValues({});
+      setObservations('');
       setViewMode('list');
       setEditingEvalId(null);
       toast.success(editingEvalId ? 'Evaluación actualizada correctamente' : 'Evaluación guardada correctamente');
@@ -411,6 +467,8 @@ export function Evaluacion() {
       toast.error('Error al guardar el borrador');
     } finally {
       setShowExitDialog(false);
+      setAllItemValues({});
+      setObservations('');
       setDraftEvalId(null);
       setViewMode('list');
       setEditingEvalId(null);
@@ -425,6 +483,8 @@ export function Evaluacion() {
       localStorage.removeItem(`draft-evaluacion-${selectedHospital.id}`);
     }
     setShowExitDialog(false);
+    setAllItemValues({});
+    setObservations('');
     setDraftEvalId(null);
     setViewMode('list');
     setEditingEvalId(null);
@@ -437,6 +497,8 @@ export function Evaluacion() {
       setShowExitDialog(true);
       return;
     }
+    setAllItemValues({});
+    setObservations('');
     setDraftEvalId(null);
     setViewMode('list');
     setEditingEvalId(null);
@@ -489,10 +551,7 @@ export function Evaluacion() {
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {hospitalsLoading ? (
         <div className="flex-1 flex items-center justify-center py-24">
-          <div
-            className="w-8 h-8 border-4 border-t-transparent rounded-full animate-spin"
-            style={{ borderColor: '#4f46e5', borderTopColor: 'transparent' }}
-          />
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent" />
         </div>
       ) : hospitals.length === 0 ? (
         <div className="flex-1 flex items-center justify-center py-24">
@@ -515,6 +574,7 @@ export function Evaluacion() {
           selectedHospital={selectedHospital}
           evaluations={evaluations}
           borradores={borradores}
+          draftsLoading={draftsLoading}
           isLoading={isLoading}
           onNewEvaluation={handleNewEvaluation}
           onViewDetail={handleViewDetail}
@@ -593,12 +653,7 @@ export function Evaluacion() {
                       {borradores[0].progress_pct}%
                     </span>
                   </div>
-                  <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-indigo-500 rounded-full transition-all"
-                      style={{ width: `${borradores[0].progress_pct}%` }}
-                    />
-                  </div>
+                  <SegmentedProgressBar tone="indigo" value={borradores[0].progress_pct} />
                 </div>
 
                 <div className="flex flex-col gap-2">
@@ -686,6 +741,7 @@ interface ListContentProps {
   selectedHospital: Hospital | null;
   evaluations: ProaEvaluation[];
   borradores: EvaluacionRecord[];
+  draftsLoading: boolean;
   isLoading: boolean;
   onNewEvaluation: () => void;
   onViewDetail: (evaluation: ProaEvaluation) => void;
@@ -703,6 +759,7 @@ function ListContent({
   selectedHospital,
   evaluations,
   borradores,
+  draftsLoading,
   isLoading,
   onNewEvaluation,
   onViewDetail,
@@ -715,9 +772,27 @@ function ListContent({
   onCancelDelete,
   onDelete,
 }: ListContentProps) {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [levelFilter, setLevelFilter] =
+    useState<'todos' | 'avanzado' | 'basico' | 'inadecuado'>('todos');
   const bestScore =
     evaluations.length > 0 ? Math.max(...evaluations.map((e) => e.total_score)) : 0;
   const latestLevel = evaluations.length > 0 ? (evaluations[0].level ?? 'inadecuado') : null;
+  const filteredEvaluations = useMemo(() => {
+    const query = normalizeText(searchQuery.trim());
+
+    return evaluations.filter((evaluation) => {
+      const matchesLevel = levelFilter === 'todos' || evaluation.level === levelFilter;
+      const matchesQuery =
+        query.length === 0 ||
+        normalizeText(evaluation.evaluator_name).includes(query) ||
+        normalizeText(evaluation.hospital_name).includes(query) ||
+        normalizeText(evaluation.evaluation_date).includes(query) ||
+        normalizeText(LEVEL_CONFIG[evaluation.level ?? 'inadecuado'].label).includes(query);
+
+      return matchesLevel && matchesQuery;
+    });
+  }, [evaluations, levelFilter, searchQuery]);
 
   return (
     <main className="flex-1 p-6 max-w-6xl mx-auto w-full">
@@ -729,7 +804,9 @@ function ListContent({
             <InfoTooltip content="Registro individual de cada intervención del equipo PROA" />
           </div>
           {selectedHospital && (
-            <p className="text-sm text-gray-500 mt-0.5">{selectedHospital.name}</p>
+            <p className="text-sm text-gray-500 mt-0.5">
+              {selectedHospital.name} · revisa borradores pendientes o abre evaluaciones completadas.
+            </p>
           )}
         </div>
         {selectedHospital && (
@@ -785,6 +862,38 @@ function ListContent({
         </div>
       )}
 
+      {(evaluations.length > 0 || borradores.length > 0 || draftsLoading) && (
+        <div className="mb-6 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px]">
+            <label className="flex items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2">
+              <Search className="h-4 w-4 text-gray-400" />
+              <input
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="Buscar por evaluador, nivel o fecha"
+                className="w-full bg-transparent text-sm text-gray-700 outline-none placeholder:text-gray-400"
+              />
+            </label>
+
+            <label className="flex items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2">
+              <SlidersHorizontal className="h-4 w-4 text-gray-400" />
+              <select
+                value={levelFilter}
+                onChange={(event) =>
+                  setLevelFilter(event.target.value as 'todos' | 'avanzado' | 'basico' | 'inadecuado')
+                }
+                className="w-full bg-transparent text-sm text-gray-700 outline-none"
+              >
+                <option value="todos">Todos los niveles</option>
+                <option value="avanzado">Avanzado</option>
+                <option value="basico">Básico</option>
+                <option value="inadecuado">Inadecuado</option>
+              </select>
+            </label>
+          </div>
+        </div>
+      )}
+
       {/* States */}
       {!selectedHospital ? (
         <EmptyState
@@ -803,10 +912,7 @@ function ListContent({
         />
       ) : isLoading ? (
         <div className="flex items-center justify-center py-24">
-          <div
-            className="w-8 h-8 border-4 border-t-transparent rounded-full animate-spin"
-            style={{ borderColor: '#4f46e5', borderTopColor: 'transparent' }}
-          />
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent" />
         </div>
       ) : (
         <>
@@ -857,6 +963,23 @@ function ListContent({
                 </div>
               }
             />
+          ) : filteredEvaluations.length === 0 && evaluations.length > 0 ? (
+            <EmptyState
+              icon={<Search className="w-20 h-20 text-gray-300" />}
+              title="No hay evaluaciones con esos filtros"
+              subtitle="Ajusta la búsqueda o el nivel para volver a ver resultados."
+              action={
+                <button
+                  onClick={() => {
+                    setSearchQuery('');
+                    setLevelFilter('todos');
+                  }}
+                  className="flex items-center justify-center gap-2 bg-gray-900 hover:bg-gray-800 text-white text-sm font-medium rounded-lg px-4 min-h-[44px] transition-colors"
+                >
+                  Limpiar filtros
+                </button>
+              }
+            />
           ) : evaluations.length > 0 ? (
             <>
               {borradores.length > 0 && (
@@ -867,7 +990,7 @@ function ListContent({
                 </div>
               )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {evaluations.map((evaluation) => (
+                {filteredEvaluations.map((evaluation) => (
                   <EvaluacionListCard
                     key={evaluation.id}
                     evaluation={evaluation}
@@ -930,12 +1053,7 @@ function DraftCard({ draft, onContinue, onDelete }: DraftCardProps) {
           <span className="text-xs text-amber-700">Progreso</span>
           <span className="text-xs font-bold text-amber-800">{draft.progress_pct}%</span>
         </div>
-        <div className="w-full h-2 bg-amber-200 rounded-full overflow-hidden">
-          <div
-            className="h-full bg-amber-500 rounded-full transition-all duration-500"
-            style={{ width: `${draft.progress_pct}%` }}
-          />
-        </div>
+        <SegmentedProgressBar tone="amber" value={draft.progress_pct} />
       </div>
 
       {confirmDelete ? (
@@ -1015,7 +1133,8 @@ function EvaluacionListCard({
 }: EvaluacionListCardProps) {
   const level = evaluation.level ?? 'inadecuado';
   const levelCfg = LEVEL_CONFIG[level] ?? LEVEL_CONFIG.inadecuado;
-  const scorePercent = Math.round((evaluation.total_score / 61) * 100);
+  const scorePercent =
+    evaluation.total_max === 0 ? 0 : Math.round((evaluation.total_score / evaluation.total_max) * 100);
   const isConfirming = confirmDeleteId === evaluation.id;
   const isDeleting = deletingId === evaluation.id;
 
@@ -1068,12 +1187,7 @@ function EvaluacionListCard({
             {evaluation.total_score} / {evaluation.total_max}
           </span>
         </div>
-        <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-          <div
-            className="h-full bg-gradient-to-r from-indigo-400 to-indigo-600 rounded-full transition-all duration-500"
-            style={{ width: `${scorePercent}%` }}
-          />
-        </div>
+        <SegmentedProgressBar tone="teal" value={scorePercent} />
       </div>
 
       {/* Section Scores */}
