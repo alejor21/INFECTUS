@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Bell, Menu, Activity, PlayCircle, Sun, Moon, Loader2, ChevronRight, Building2 } from 'lucide-react';
+import { Bell, Menu, Activity, PlayCircle, Sun, Moon, Loader2, ChevronRight, Building2, Calendar } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router';
 import { toast } from 'sonner';
 import { useAuth } from '../../contexts/AuthContext';
@@ -48,7 +48,9 @@ export function Header({ onMenuOpen, onStartTour }: HeaderProps) {
   const { theme, toggleTheme } = useTheme();
 
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showDateMenuMobile, setShowDateMenuMobile] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
+  const dateMenuRef = useRef<HTMLDivElement>(null);
   const unreadAlerts = useAlertBadge();
 
   // Close user menu on outside click
@@ -57,12 +59,15 @@ export function Header({ onMenuOpen, onStartTour }: HeaderProps) {
       if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
         setShowUserMenu(false);
       }
+      if (dateMenuRef.current && !dateMenuRef.current.contains(e.target as Node)) {
+        setShowDateMenuMobile(false);
+      }
     };
-    if (showUserMenu) {
+    if (showUserMenu || showDateMenuMobile) {
       document.addEventListener('mousedown', handler);
     }
     return () => { document.removeEventListener('mousedown', handler); };
-  }, [showUserMenu]);
+  }, [showUserMenu, showDateMenuMobile]);
 
   const initials =
     profile?.avatar_initials ??
@@ -141,11 +146,19 @@ export function Header({ onMenuOpen, onStartTour }: HeaderProps) {
 
           {/* Active Filters - show on desktop and mobile */}
           <div className="hidden lg:block">
-            <ActiveFilters
-              hospital={selectedHospitalObj?.name}
-              dateRange={dateRange}
-              className="ml-8 text-xs"
-            />
+            <div className="flex items-center gap-3">
+              {selectedHospitalObj && (
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-teal-50 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300 rounded-lg text-sm font-medium">
+                  <Building2 className="w-4 h-4" />
+                  <span>{selectedHospitalObj.name}</span>
+                </div>
+              )}
+              <ActiveFilters
+                hospital={selectedHospitalObj?.name}
+                dateRange={dateRange}
+                className="text-xs"
+              />
+            </div>
           </div>
         </div>
 
@@ -158,14 +171,46 @@ export function Header({ onMenuOpen, onStartTour }: HeaderProps) {
                 key={r}
                 onClick={() => setDateRange(r)}
                 className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200 ${
-                  dateRange === r 
-                    ? 'bg-white dark:bg-gray-700 text-teal-600 dark:text-teal-400 shadow-sm' 
+                  dateRange === r
+                    ? 'bg-white dark:bg-gray-700 text-teal-600 dark:text-teal-400 shadow-sm'
                     : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
                 }`}
               >
                 {DATE_RANGE_LABELS[r]}
               </button>
             ))}
+          </div>
+
+          {/* Date range dropdown — mobile only */}
+          <div className="relative lg:hidden" ref={dateMenuRef}>
+            <button
+              onClick={() => setShowDateMenuMobile((v) => !v)}
+              className="p-2.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+              title="Rango de fecha"
+            >
+              <Calendar className="w-5 h-5" />
+            </button>
+
+            {showDateMenuMobile && (
+              <div className="absolute right-0 top-12 w-40 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg shadow-lg py-2 z-50">
+                {(['1m', '6m', '12m', 'all'] as const).map((r) => (
+                  <button
+                    key={r}
+                    onClick={() => {
+                      setDateRange(r);
+                      setShowDateMenuMobile(false);
+                    }}
+                    className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${
+                      dateRange === r
+                        ? 'bg-teal-50 dark:bg-teal-900/30 text-teal-600 dark:text-teal-400 font-medium'
+                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
+                    }`}
+                  >
+                    {DATE_RANGE_LABELS[r]}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Theme toggle */}
