@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Bell, Menu, Activity, PlayCircle, Sun, Moon, Loader2, ChevronRight, Building2, Calendar } from 'lucide-react';
+import { Bell, Menu, Activity, PlayCircle, Sun, Moon, Loader2, ChevronRight, Building2, Calendar, LogOut } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router';
 import { toast } from 'sonner';
 import { useAuth } from '../../contexts/AuthContext';
@@ -7,6 +7,7 @@ import { useHospitalContext } from '../../contexts/HospitalContext';
 import { useAlertBadge } from '../../hooks/useAlerts';
 import { useTheme } from '../../contexts/ThemeContext';
 import { ActiveFilters } from './ActiveFilters';
+import { signOut } from '../../lib/supabase/auth';
 
 const DATE_RANGE_LABELS: Record<'1m' | '6m' | '12m' | 'all', string> = {
   '1m': '1M',
@@ -49,6 +50,7 @@ export function Header({ onMenuOpen, onStartTour }: HeaderProps) {
 
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showDateMenuMobile, setShowDateMenuMobile] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const dateMenuRef = useRef<HTMLDivElement>(null);
   const unreadAlerts = useAlertBadge();
@@ -106,6 +108,17 @@ export function Header({ onMenuOpen, onStartTour }: HeaderProps) {
   if (currentPage) {
     breadcrumbItems.push({ label: currentPage.label });
   }
+
+  const handleSignOut = async () => {
+    setIsSigningOut(true);
+    try {
+      await signOut();
+      navigate('/login', { replace: true });
+    } catch {
+      toast.error('Error al cerrar sesión');
+      setIsSigningOut(false);
+    }
+  };
 
   return (
     <header className="bg-white dark:bg-gray-950 border-b border-gray-200 dark:border-gray-800 fixed top-0 right-0 left-0 lg:left-64 z-20">
@@ -274,7 +287,7 @@ export function Header({ onMenuOpen, onStartTour }: HeaderProps) {
                   onClick={() => { setShowUserMenu(false); navigate('/configuracion'); }}
                   className="w-full text-left px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                 >
-                  Mi perfil
+                  Ver perfil
                 </button>
                 <button
                   onClick={() => { setShowUserMenu(false); onStartTour?.(); }}
@@ -282,6 +295,17 @@ export function Header({ onMenuOpen, onStartTour }: HeaderProps) {
                 >
                   <PlayCircle className="w-4 h-4 text-teal-600" />
                   Ver tour de bienvenida
+                </button>
+                <button
+                  onClick={() => {
+                    setShowUserMenu(false);
+                    void handleSignOut();
+                  }}
+                  disabled={isSigningOut}
+                  className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/30 transition-colors disabled:opacity-50"
+                >
+                  {isSigningOut ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogOut className="w-4 h-4" />}
+                  Cerrar sesión
                 </button>
               </div>
             )}

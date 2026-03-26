@@ -151,7 +151,6 @@ export function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
     setIsSigningOut(true);
     try {
       await signOut();
-      localStorage.removeItem('infectus-onboarding-complete');
       navigate('/login', { replace: true });
     } catch {
       toast.error('Error al cerrar sesión');
@@ -174,7 +173,7 @@ export function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
     administrador: 'Administrador',
     infectologo: 'Infectólogo',
     medico: 'Médico',
-    visor: 'Visitante',
+    visor: 'Visor',
   };
 
   return (
@@ -299,29 +298,29 @@ export function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
 
       {/* User section */}
       <div className="p-3 border-t border-gray-200 dark:border-gray-800 shrink-0">
-        <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-900">
-          <div className="w-9 h-9 rounded-full bg-teal-600 flex items-center justify-center text-white text-sm font-semibold shrink-0">
-            {initials}
+        <div className="rounded-xl bg-gray-50 p-3 dark:bg-gray-900">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-full bg-teal-600 flex items-center justify-center text-white text-sm font-semibold shrink-0">
+              {initials}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                {profile?.full_name ?? 'Usuario'}
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                {roleLabels[profile?.role ?? ''] ?? profile?.role ?? '—'}
+              </p>
+            </div>
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-              {profile?.full_name ?? 'Usuario'}
-            </p>
-            <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-              {roleLabels[profile?.role ?? ''] ?? profile?.role ?? '—'}
-            </p>
-          </div>
+
           <button
             onClick={handleSignOut}
             disabled={isSigningOut}
-            className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-800 text-gray-500 hover:text-red-600 dark:hover:text-red-400 transition-colors disabled:opacity-50"
+            className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 disabled:opacity-50 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-200 dark:hover:bg-gray-800"
             title="Cerrar sesión"
           >
-            {isSigningOut ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <LogOut className="w-4 h-4" />
-            )}
+            {isSigningOut ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogOut className="w-4 h-4" />}
+            Cerrar sesión
           </button>
         </div>
       </div>
