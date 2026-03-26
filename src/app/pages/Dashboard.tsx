@@ -39,6 +39,13 @@ function relativeDate(dateStr: string): string {
   return `Hace ${Math.floor(diffDays / 30)} meses`;
 }
 
+interface RecommendedAction {
+  title: string;
+  description: string;
+  label: string;
+  onClick: () => void;
+}
+
 const STATUS_BADGE: Record<string, { label: string; cls: string }> = {
   borrador: {
     label: 'Borrador',
@@ -139,6 +146,26 @@ export function Dashboard() {
   const firstName = profile?.full_name?.split(' ')[0] || 'Doctor';
   const level = stats?.proaLevel ?? null;
   const levelConf = level ? (LEVEL_BADGE[level] ?? null) : null;
+  const recommendedAction: RecommendedAction = !hasHospital
+    ? {
+        title: 'Primero define tu hospital de trabajo',
+        description: 'Crea la institución o selecciona una existente para que el dashboard muestre datos clínicos reales.',
+        label: 'Ir a hospitales',
+        onClick: () => navigate('/hospitales'),
+      }
+    : hasNoData
+      ? {
+          title: 'Carga el Excel PROA del período',
+          description: 'Con el archivo mensual podrás obtener métricas automáticas, tendencias y alertas básicas sin digitación manual.',
+          label: 'Subir Excel',
+          onClick: () => navigate('/hospitales'),
+        }
+      : {
+          title: 'Continúa el seguimiento clínico',
+          description: 'Revisa la actividad reciente o registra una nueva evaluación si hay intervenciones pendientes del día.',
+          label: 'Nueva evaluación',
+          onClick: () => navigate('/evaluacion'),
+        };
 
   return (
     <div className="mx-auto max-w-7xl space-y-8 px-4 py-8 sm:px-6">
@@ -199,6 +226,28 @@ export function Dashboard() {
         </div>
       )}
 
+      <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-teal-600 dark:text-teal-300">
+              Siguiente paso recomendado
+            </p>
+            <h2 className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
+              {recommendedAction.title}
+            </h2>
+            <p className="mt-1 max-w-3xl text-sm text-gray-500 dark:text-gray-400">
+              {recommendedAction.description}
+            </p>
+          </div>
+          <button
+            onClick={recommendedAction.onClick}
+            className="inline-flex min-h-[44px] items-center justify-center rounded-xl bg-teal-600 px-4 py-2.5 text-sm font-medium text-white transition-all duration-200 hover:bg-teal-700"
+          >
+            {recommendedAction.label}
+          </button>
+        </div>
+      </div>
+
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <div className="rounded-2xl border border-gray-200 bg-white p-5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:border-gray-800 dark:bg-gray-900">
           <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-teal-50 dark:bg-teal-900/30">
@@ -207,10 +256,10 @@ export function Dashboard() {
           <p className={`text-3xl font-bold text-gray-900 dark:text-white ${dataLoading ? 'animate-pulse opacity-40' : ''}`}>
             {dataLoading ? '—' : hasHospital ? String(stats?.evalCount ?? '—') : '—'}
           </p>
-          <p className="mt-1 text-sm font-medium text-gray-500 dark:text-gray-400">Evaluaciones</p>
+          <p className="mt-1 text-sm font-medium text-gray-500 dark:text-gray-400">Evaluaciones registradas</p>
           <div className="mt-2 flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500">
             <TrendingUp className="h-3 w-3 text-emerald-500" />
-            <span className="text-emerald-600 dark:text-emerald-400">Este mes</span>
+            <span className="text-emerald-600 dark:text-emerald-400">Seguimiento del período actual</span>
           </div>
         </div>
 
@@ -221,7 +270,7 @@ export function Dashboard() {
           <p className={`text-xl font-bold leading-tight text-gray-900 dark:text-white ${dataLoading ? 'animate-pulse opacity-40' : ''}`}>
             {dataLoading ? '—' : hasHospital ? (stats?.lastEval ? relativeDate(stats.lastEval.created_at) : 'Sin evaluaciones') : '—'}
           </p>
-          <p className="mt-1 text-sm font-medium text-gray-500 dark:text-gray-400">Última evaluación</p>
+          <p className="mt-1 text-sm font-medium text-gray-500 dark:text-gray-400">Último registro</p>
           {hasHospital && stats?.lastEval && (
             <div className="mt-2">
               <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_BADGE[stats.lastEval.status]?.cls ?? 'bg-gray-100 text-gray-600'}`}>
@@ -247,7 +296,7 @@ export function Dashboard() {
             {dataLoading ? '—' : hasHospital ? (levelConf ? levelConf.label : 'Sin datos') : '—'}
           </p>
           <p className="mt-1 text-sm font-medium text-gray-500 dark:text-gray-400">Nivel PROA</p>
-          <p className="mt-2 text-xs text-gray-400 dark:text-gray-500">Última evaluación</p>
+          <p className="mt-2 text-xs text-gray-400 dark:text-gray-500">Según la evaluación más reciente</p>
         </div>
 
         <div className="rounded-2xl border border-gray-200 bg-white p-5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:border-gray-800 dark:bg-gray-900">
@@ -257,8 +306,8 @@ export function Dashboard() {
           <p className={`text-3xl font-bold text-gray-900 dark:text-white ${dataLoading ? 'animate-pulse opacity-40' : ''}`}>
             {dataLoading ? '—' : hasHospital ? String(stats?.excelMonths ?? '—') : '—'}
           </p>
-          <p className="mt-1 text-sm font-medium text-gray-500 dark:text-gray-400">Meses cargados</p>
-          <p className="mt-2 text-xs text-gray-400 dark:text-gray-500">Datos desde Excel</p>
+          <p className="mt-1 text-sm font-medium text-gray-500 dark:text-gray-400">Meses con Excel</p>
+          <p className="mt-2 text-xs text-gray-400 dark:text-gray-500">Fuente para analíticas automáticas</p>
         </div>
       </div>
 
@@ -291,8 +340,11 @@ export function Dashboard() {
       )}
 
       <div>
-        <h2 className="mb-4 text-xl font-semibold text-gray-900 dark:text-white">Acciones rápidas</h2>
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+        <h2 className="mb-2 text-xl font-semibold text-gray-900 dark:text-white">Tareas frecuentes</h2>
+        <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
+          Accesos directos para las acciones que el equipo clínico usa con más frecuencia.
+        </p>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <button
             onClick={() => navigate('/evaluacion')}
             className="group rounded-2xl border border-gray-200 bg-white p-5 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-teal-300 hover:shadow-md dark:border-gray-800 dark:bg-gray-900 dark:hover:border-teal-700"
@@ -301,7 +353,7 @@ export function Dashboard() {
               <ClipboardCheck className="h-5 w-5 text-teal-600" />
             </div>
             <p className="mb-1 text-sm font-semibold text-gray-900 dark:text-white">Nueva evaluación PROA</p>
-            <p className="text-xs leading-relaxed text-gray-500 dark:text-gray-400">Registra una evaluación del programa.</p>
+            <p className="text-xs leading-relaxed text-gray-500 dark:text-gray-400">Registra una intervención individual y continúa el seguimiento clínico.</p>
           </button>
 
           <button
@@ -312,7 +364,7 @@ export function Dashboard() {
               <BarChart3 className="h-5 w-5 text-blue-600" />
             </div>
             <p className="mb-1 text-sm font-semibold text-gray-900 dark:text-white">Ver analíticas</p>
-            <p className="text-xs leading-relaxed text-gray-500 dark:text-gray-400">Consulta tendencias y métricas del hospital.</p>
+            <p className="text-xs leading-relaxed text-gray-500 dark:text-gray-400">Consulta indicadores, tendencias y comportamiento por servicio.</p>
           </button>
 
           <button
@@ -323,7 +375,7 @@ export function Dashboard() {
               <Building2 className="h-5 w-5 text-violet-600" />
             </div>
             <p className="mb-1 text-sm font-semibold text-gray-900 dark:text-white">Gestionar hospitales</p>
-            <p className="text-xs leading-relaxed text-gray-500 dark:text-gray-400">Agrega, edita o revisa instituciones.</p>
+            <p className="text-xs leading-relaxed text-gray-500 dark:text-gray-400">Edita datos institucionales y carga archivos del programa.</p>
           </button>
 
           <button
@@ -334,29 +386,7 @@ export function Dashboard() {
               <AlertTriangle className="h-5 w-5 text-amber-600" />
             </div>
             <p className="mb-1 text-sm font-semibold text-gray-900 dark:text-white">Registrar IAAS</p>
-            <p className="text-xs leading-relaxed text-gray-500 dark:text-gray-400">Registra infecciones asociadas a la atención.</p>
-          </button>
-
-          <button
-            onClick={() => navigate('/calculadora-ddd')}
-            className="group rounded-2xl border border-gray-200 bg-white p-5 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md dark:border-gray-800 dark:bg-gray-900 dark:hover:border-emerald-700"
-          >
-            <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-50 transition-transform duration-200 group-hover:scale-110 dark:bg-emerald-900/30">
-              <Calculator className="h-5 w-5 text-emerald-600" />
-            </div>
-            <p className="mb-1 text-sm font-semibold text-gray-900 dark:text-white">Calculadora DDD</p>
-            <p className="text-xs leading-relaxed text-gray-500 dark:text-gray-400">Apoya cálculos manuales de dosis definidas.</p>
-          </button>
-
-          <button
-            onClick={() => navigate('/reportes')}
-            className="group rounded-2xl border border-gray-200 bg-white p-5 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-rose-300 hover:shadow-md dark:border-gray-800 dark:bg-gray-900 dark:hover:border-rose-700"
-          >
-            <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-rose-50 transition-transform duration-200 group-hover:scale-110 dark:bg-rose-900/30">
-              <FileText className="h-5 w-5 text-rose-600" />
-            </div>
-            <p className="mb-1 text-sm font-semibold text-gray-900 dark:text-white">Generar reporte</p>
-            <p className="text-xs leading-relaxed text-gray-500 dark:text-gray-400">Exporta reportes en PDF.</p>
+            <p className="text-xs leading-relaxed text-gray-500 dark:text-gray-400">Documenta infecciones asociadas a la atención cuando requieras seguimiento adicional.</p>
           </button>
         </div>
       </div>

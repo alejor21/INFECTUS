@@ -1,10 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Outlet } from 'react-router';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { TourOverlay } from './TourOverlay';
 import { HospitalProvider } from '../../contexts/HospitalContext';
-import { useAuth } from '../../contexts/AuthContext';
 import { useTour } from '../../hooks/useTour';
 
 // Re-exported so existing pages (e.g. Dashboard.tsx) keep working without changes
@@ -12,17 +11,7 @@ export { useHospitalContext } from '../../contexts/HospitalContext';
 
 export function Layout() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const { user, loading } = useAuth();
   const tour = useTour();
-
-  // Auto-start tour for first-time users after a short delay
-  useEffect(() => {
-    if (loading || tour.hasCompleted || !user) return;
-    const timer = setTimeout(() => {
-      tour.startTour();
-    }, 1500);
-    return () => clearTimeout(timer);
-  }, [user, loading, tour.hasCompleted, tour.startTour]);
 
   return (
     <HospitalProvider>

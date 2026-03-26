@@ -135,9 +135,9 @@ export function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
   const TOUR_IDS: Record<string, string> = {
     '/dashboard': 'tour-dashboard',
     '/hospitales': 'tour-hospitales',
-    '/pacientes': 'tour-pacientes',
-    '/calculadora-ddd': 'tour-calculadora',
-    '/alertas': 'tour-alertas',
+    '/evaluacion': 'tour-evaluaciones',
+    '/indicadores-proa': 'tour-analytics',
+    '/configuracion': 'tour-configuracion',
     '/reportes': 'tour-reportes',
   };
 

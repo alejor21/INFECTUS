@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useCallback, useState } from 'react';
 
 export interface TourStep {
   id: string;
@@ -13,9 +13,9 @@ const TOUR_STORAGE_KEY = 'infectus_tour_completed';
 export const TOUR_STEPS: TourStep[] = [
   {
     id: 'welcome',
-    title: '¡Bienvenido a Infectus!',
+    title: 'Bienvenido a INFECTUS',
     description:
-      'Te guiaremos por las funciones principales del programa PROA. Puedes omitir este tour en cualquier momento.',
+      'Esta guía interactiva te muestra dónde empezar para registrar intervenciones, revisar analíticas y configurar tu hospital.',
     targetId: null,
     position: 'center',
   },
@@ -23,7 +23,7 @@ export const TOUR_STEPS: TourStep[] = [
     id: 'tour-dashboard',
     title: 'Dashboard',
     description:
-      'El panel principal muestra los KPIs clave: adecuación terapéutica, consumo de antibióticos, tasa de IAAS y cumplimiento de guías clínicas.',
+      'Aquí ves el resumen clínico del hospital: actividad reciente, nivel PROA, meses cargados y acciones sugeridas para continuar.',
     targetId: 'tour-dashboard',
     position: 'right',
   },
@@ -31,47 +31,47 @@ export const TOUR_STEPS: TourStep[] = [
     id: 'tour-hospitales',
     title: 'Hospitales',
     description:
-      'Gestiona los centros del programa. Aquí puedes registrar hospitales, cargar archivos Excel con intervenciones y ver el historial de cargas.',
+      'En esta sección creas hospitales, subes el Excel PROA y revisas el historial de archivos cargados.',
     targetId: 'tour-hospitales',
     position: 'right',
   },
   {
-    id: 'tour-pacientes',
-    title: 'Pacientes',
+    id: 'tour-evaluaciones',
+    title: 'Evaluaciones',
     description:
-      'Lleva fichas clínicas individuales con historial de antibióticos, estado del tratamiento y seguimiento de evolución por paciente.',
-    targetId: 'tour-pacientes',
+      'Aquí registras cada intervención del equipo PROA, continúas borradores y consultas el detalle de evaluaciones previas.',
+    targetId: 'tour-evaluaciones',
     position: 'right',
   },
   {
-    id: 'tour-calculadora',
-    title: 'Calculadora DDD',
+    id: 'tour-analytics',
+    title: 'Analíticas',
     description:
-      'Calcula la Dosis Diaria Definida (DDD/100 camas-día) según estándares OMS, con importación automática desde los registros cargados.',
-    targetId: 'tour-calculadora',
+      'Usa esta vista para identificar tendencias, servicios con mayor carga y oportunidades de mejora del programa.',
+    targetId: 'tour-analytics',
     position: 'right',
   },
   {
-    id: 'tour-alertas',
-    title: 'Alertas',
+    id: 'tour-configuracion',
+    title: 'Configuración',
     description:
-      'Monitorea alertas activas sobre terapias no aprobadas, resistencias críticas y patrones de consumo que requieren atención.',
-    targetId: 'tour-alertas',
+      'Desde aquí actualizas tu perfil, el hospital activo, usuarios y preferencias de uso.',
+    targetId: 'tour-configuracion',
     position: 'right',
   },
   {
     id: 'tour-reportes',
-    title: 'Reportes IA',
+    title: 'Reportes',
     description:
-      'Genera reportes ejecutivos PROA, detecta alertas epidemiológicas y consulta al asistente clínico, todo con inteligencia artificial.',
+      'Exporta resúmenes y documentos para comités clínicos, auditorías o seguimiento institucional.',
     targetId: 'tour-reportes',
     position: 'right',
   },
   {
     id: 'finish',
-    title: '¡Todo listo!',
+    title: 'Todo listo',
     description:
-      'Ya conoces las funciones principales de Infectus. Puedes volver a ver este tour desde el menú de usuario cuando lo necesites.',
+      'Ya conoces las funciones principales. Cuando quieras, vuelve a abrir esta guía desde el menú del usuario.',
     targetId: null,
     position: 'center',
   },
