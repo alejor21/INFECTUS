@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import {
   ArrowLeft,
   Plus,
@@ -19,14 +19,15 @@ import {
   updateHospital,
   deleteHospital,
   saveHospitalFile,
-  deleteHospitalFile,
+  deleteHospitalFileData,
 } from '../../lib/supabase/hospitals';
 import type { Hospital, HospitalFile } from '../../lib/supabase/hospitals';
 import { parseInterventionFile } from '../../lib/parsers/excelParser';
 import { upsertInterventions } from '../../lib/supabase/queries/interventions';
-import { getSupabaseClient } from '../../lib/supabase/client';
 import { toast } from 'sonner';
 import { processAndSaveExcel } from '../../modules/excel/excelProcessor';
+import { useHospitalFiles } from '../../hooks/useHospitalFiles';
+import { useHospitalUploadStatuses } from '../../hooks/useHospitalUploadStatuses';
 
 const MONTH_NAMES = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -41,12 +42,6 @@ interface PendingFile {
   status: 'idle' | 'uploading' | 'done' | 'error';
   message: string;
   aiWarning?: string; // set when AI normalization was unavailable
-}
-
-interface ExcelStatus {
-  months_found: string[];
-  total_rows: number;
-  uploaded_at: string;
 }
 
 function filesInRange(
@@ -78,16 +73,51 @@ function formatUploadDate(ts: string): string {
   return `${dd}/${mm}/${yyyy} ${hh}:${min}`;
 }
 
+function isValidEmail(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+interface HospitalFormValues {
+  name: string;
+  city: string;
+  department: string;
+  beds: string;
+  contactEmail: string;
+}
+
+function validateHospitalForm({
+  name,
+  city,
+  department,
+  beds,
+  contactEmail,
+}: HospitalFormValues): string | null {
+  if (!name.trim() || !city.trim() || !department.trim()) {
+    return 'Nombre, ciudad y departamento son obligatorios.';
+  }
+
+  if (beds.trim()) {
+    const bedsValue = Number(beds);
+    if (!Number.isInteger(bedsValue) || bedsValue < 0) {
+      return 'El número de camas debe ser un entero mayor o igual a cero.';
+    }
+  }
+
+  if (contactEmail.trim() && !isValidEmail(contactEmail.trim())) {
+    return 'Ingresa un correo de contacto válido.';
+  }
+
+  return null;
+}
+
 export function Hospitales() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { canCreate, canDelete } = usePermissions();
   const {
     hospitals,
-    hospitalFiles,
     setSelectedHospitalObj,
     refreshHospitals,
-    refreshFiles,
     dateRange,
     setDateRange,
   } = useHospitalContext();
@@ -138,10 +168,19 @@ export function Hospitales() {
   const [updateTargetId, setUpdateTargetId] = useState<string | null>(null);
   const [updatingExcelId, setUpdatingExcelId] = useState<string | null>(null);
 
-  // Upload status per hospital card
-  const [uploadStatuses, setUploadStatuses] = useState<Record<string, ExcelStatus>>({});
+  const {
+    files: activeHospitalFiles,
+    loading: activeFilesLoading,
+    error: activeFilesError,
+    refresh: refreshActiveFiles,
+  } = useHospitalFiles(activeHospital?.id ?? null);
+  const {
+    statuses: uploadStatuses,
+    refresh: refreshUploadStatuses,
+  } = useHospitalUploadStatuses(hospitals.map((hospital) => hospital.id));
 
   const openDetail = useCallback((h: Hospital) => {
+    setSelectedHospitalObj(h);
     setActiveHospital(h);
     setEditName(h.name);
     setEditCity(h.city);
@@ -157,7 +196,7 @@ export function Hospitales() {
     setDeleteConfirmId(null);
     setActiveTab('info');
     setView('detail');
-  }, []);
+  }, [setSelectedHospitalObj]);
 
   const backToList = useCallback(() => {
     setView('list');
@@ -175,39 +214,57 @@ export function Hospitales() {
   };
 
   const handleAddHospital = async () => {
-    if (!addName.trim() || !addCity.trim() || !addDept.trim()) {
-      setAddError('Nombre, ciudad y departamento son obligatorios.');
+    const validationError = validateHospitalForm({
+      name: addName,
+      city: addCity,
+      department: addDept,
+      beds: addBeds,
+      contactEmail: addContactEmail,
+    });
+
+    if (validationError) {
+      setAddError(validationError);
       return;
     }
+
     setAddSaving(true);
     setAddError('');
-    const { data: newHospital, error } = await createHospital({
-      name: addName.trim(),
-      city: addCity.trim(),
-      department: addDept.trim(),
-      beds: addBeds ? parseInt(addBeds, 10) : null,
-      contact_name: addContactName.trim() || null,
-      contact_email: addContactEmail.trim() || null,
-      is_active: true,
-    });
-    setAddSaving(false);
-    if (error) {
-      setAddError(error.message);
-    } else {
+
+    try {
+      const { data: newHospital, error } = await createHospital({
+        name: addName.trim(),
+        city: addCity.trim(),
+        department: addDept.trim(),
+        beds: addBeds ? parseInt(addBeds, 10) : null,
+        contact_name: addContactName.trim() || null,
+        contact_email: addContactEmail.trim().toLowerCase() || null,
+        is_active: true,
+      });
+
+      if (error) {
+        setAddError(error.message);
+        return;
+      }
+
       if (addExcelFile && newHospital?.id && user?.id) {
         setAddExcelProcessing(true);
         toast.info('Procesando Excel...');
         const result = await processAndSaveExcel(newHospital.id, addExcelFile, user.id);
         if (result.success) {
-          toast.success(`Hospital creado y Excel procesado: ${result.monthsFound.length} mes${result.monthsFound.length !== 1 ? 'es' : ''}, ${result.totalRows} registros`);
+          toast.success(`Hospital creado y Excel procesado: ${result.monthsFound.length} mes${result.monthsFound.length !== 1 ? 'es' : ''}, ${result.totalRows} registros.`);
+          await refreshUploadStatuses();
         } else {
-          toast.error(result.error ?? 'Error al procesar el Excel');
+          toast.error(result.error ?? 'Error al procesar el Excel.');
         }
         setAddExcelProcessing(false);
       }
+
       await refreshHospitals();
+      toast.success('Hospital guardado correctamente.');
       resetAddForm();
       setShowAddForm(false);
+    } finally {
+      setAddSaving(false);
     }
   };
 
@@ -215,34 +272,74 @@ export function Hospitales() {
 
   const handleSaveEdit = async () => {
     if (!activeHospital) return;
+
+    const validationError = validateHospitalForm({
+      name: editName,
+      city: editCity,
+      department: editDept,
+      beds: editBeds,
+      contactEmail: editContactEmail,
+    });
+
+    if (validationError) {
+      setEditError(validationError);
+      return;
+    }
+
     setEditSaving(true);
     setEditError('');
-    const { error } = await updateHospital(activeHospital.id, {
-      name: editName.trim(),
-      city: editCity.trim(),
-      department: editDept.trim(),
-      beds: editBeds ? parseInt(editBeds, 10) : null,
-      contact_name: editContactName.trim() || null,
-      contact_email: editContactEmail.trim() || null,
-      is_active: editIsActive,
-    });
-    setEditSaving(false);
-    if (error) {
-      setEditError(error.message);
-    } else {
+
+    try {
+      const { error } = await updateHospital(activeHospital.id, {
+        name: editName.trim(),
+        city: editCity.trim(),
+        department: editDept.trim(),
+        beds: editBeds ? parseInt(editBeds, 10) : null,
+        contact_name: editContactName.trim() || null,
+        contact_email: editContactEmail.trim().toLowerCase() || null,
+        is_active: editIsActive,
+      });
+
+      if (error) {
+        setEditError(error.message);
+        return;
+      }
+
       setEditSaved(true);
-      setActiveHospital({ ...activeHospital, name: editName.trim(), is_active: editIsActive });
+      setActiveHospital({
+        ...activeHospital,
+        name: editName.trim(),
+        city: editCity.trim(),
+        department: editDept.trim(),
+        beds: editBeds ? parseInt(editBeds, 10) : null,
+        contact_name: editContactName.trim() || null,
+        contact_email: editContactEmail.trim().toLowerCase() || null,
+        is_active: editIsActive,
+      });
       await refreshHospitals();
+      toast.success('Hospital actualizado correctamente.');
+    } finally {
+      setEditSaving(false);
     }
   };
 
   const handleDelete = async () => {
     if (!activeHospital) return;
     setDeleting(true);
-    await deleteHospital(activeHospital.id);
-    await refreshHospitals();
-    setDeleting(false);
-    backToList();
+
+    try {
+      const { error } = await deleteHospital(activeHospital.id);
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+
+      await refreshHospitals();
+      toast.success('Hospital eliminado correctamente.');
+      backToList();
+    } finally {
+      setDeleting(false);
+    }
   };
 
   // ── VIEW B: file upload ───────────────────────────────────────────────────
@@ -274,16 +371,16 @@ export function Hospitales() {
     if (!pf) return;
 
     setPendingFiles((prev) =>
-      prev.map((p) => p.id === pendingId ? { ...p, status: 'uploading', message: '🤖 Analizando con IA...' } : p),
+      prev.map((p) => (p.id === pendingId ? { ...p, status: 'uploading', message: 'Analizando archivo...' } : p)),
     );
 
     try {
-      // Parse with AI-enhanced column mapping and antibiotic normalization
       const { valid, errors, aiWarning } = await parseInterventionFile(pf.file);
       if (valid.length === 0) {
         throw new Error(errors.length > 0 ? errors[0].message : 'Sin registros válidos en el archivo.');
       }
-      const recordsWithHospital = valid.map((r) => ({ ...r, hospitalName: activeHospital.name }));
+
+      const recordsWithHospital = valid.map((record) => ({ ...record, hospitalName: activeHospital.name }));
       const { inserted, error: uploadError } = await upsertInterventions(recordsWithHospital);
       if (uploadError) throw new Error(uploadError);
 
@@ -296,7 +393,8 @@ export function Hospitales() {
         uploaded_by: user?.id ?? null,
       });
 
-      await refreshFiles();
+      await refreshActiveFiles();
+      await refreshUploadStatuses();
       window.dispatchEvent(new CustomEvent('infectus:data-updated'));
 
       setPendingFiles((prev) =>
@@ -306,11 +404,13 @@ export function Hospitales() {
             : p,
         ),
       );
+      toast.success(`${inserted} registros cargados correctamente.`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       setPendingFiles((prev) =>
-        prev.map((p) => p.id === pendingId ? { ...p, status: 'error', message: msg } : p),
+        prev.map((p) => (p.id === pendingId ? { ...p, status: 'error', message: msg } : p)),
       );
+      toast.error(msg);
     }
   };
 
@@ -320,39 +420,28 @@ export function Hospitales() {
 
   // Delete a hospital file AND its associated intervention records
   const handleDeleteFileConfirmed = async (fileId: string) => {
-    const f = hospitalFiles.find((hf) => hf.id === fileId);
+    const f = activeHospitalFiles.find((hf) => hf.id === fileId);
     if (!f || !activeHospital) return;
 
-    // Remove interventions that match hospital + month/year (fecha is DD/MM/YYYY)
-    const monthPad = f.month.toString().padStart(2, '0');
-    await getSupabaseClient()
-      .from('interventions')
-      .delete()
-      .eq('hospital_name', activeHospital.name)
-      .like('fecha', `__/${monthPad}/${f.year}`);
+    const { error } = await deleteHospitalFileData(
+      activeHospital.id,
+      activeHospital.name,
+      fileId,
+      f.month,
+      f.year,
+    );
 
-    await deleteHospitalFile(fileId);
-    await refreshFiles();
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+
+    await refreshActiveFiles();
+    await refreshUploadStatuses();
     window.dispatchEvent(new CustomEvent('infectus:data-updated'));
     setDeleteConfirmId(null);
+    toast.success('Archivo eliminado correctamente.');
   };
-
-  // Fetch Excel upload status for each hospital card
-  useEffect(() => {
-    if (hospitals.length === 0) return;
-    getSupabaseClient()
-      .from('hospital_excel_uploads')
-      .select('hospital_id, months_found, total_rows, uploaded_at')
-      .in('hospital_id', hospitals.map((h) => h.id))
-      .then(({ data }) => {
-        if (!data) return;
-        const map: Record<string, ExcelStatus> = {};
-        for (const u of (data as Array<{ hospital_id: string; months_found: string[]; total_rows: number; uploaded_at: string }>)) {
-          map[u.hospital_id] = { months_found: u.months_found, total_rows: u.total_rows, uploaded_at: u.uploaded_at };
-        }
-        setUploadStatuses(map);
-      });
-  }, [hospitals]);
 
   const handleUpdateExcel = async (file: File, hospitalId: string) => {
     if (!user?.id) return;
@@ -360,9 +449,10 @@ export function Hospitales() {
     toast.info('Procesando Excel...');
     const result = await processAndSaveExcel(hospitalId, file, user.id);
     if (result.success) {
-      toast.success(`Excel actualizado: ${result.monthsFound.length} mes${result.monthsFound.length !== 1 ? 'es' : ''}, ${result.totalRows} registros`);
+      toast.success(`Excel actualizado: ${result.monthsFound.length} mes${result.monthsFound.length !== 1 ? 'es' : ''}, ${result.totalRows} registros.`);
+      await refreshUploadStatuses();
     } else {
-      toast.error(result.error ?? 'Error al procesar el Excel');
+      toast.error(result.error ?? 'Error al procesar el Excel.');
     }
     setUpdatingExcelId(null);
     setUpdateTargetId(null);
@@ -378,7 +468,7 @@ export function Hospitales() {
         {/* Header */}
         <div className="flex flex-wrap items-center justify-between gap-3 mb-6 lg:mb-8">
           <div>
-            <h1 className="text-3xl font-bold mb-1" style={{ color: '#0B3C5D' }}>
+            <h1 className="mb-1 text-3xl font-bold text-slate-900 dark:text-white">
               Gestión de Hospitales
             </h1>
             <p className="text-gray-500 text-sm">
@@ -388,8 +478,7 @@ export function Hospitales() {
           {canCreate && (
             <button
               onClick={() => { resetAddForm(); setShowAddForm((v) => !v); }}
-              className="flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors min-h-[44px]"
-              style={{ backgroundColor: '#0F8B8D' }}
+              className="flex min-h-[44px] items-center space-x-2 rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-teal-700"
             >
               <Plus className="w-4 h-4" />
               <span>Nuevo Hospital</span>
@@ -486,8 +575,7 @@ export function Hospitales() {
               <button
                 onClick={handleAddHospital}
                 disabled={addSaving || addExcelProcessing}
-                className="px-4 py-2 text-sm font-medium text-white rounded-lg disabled:opacity-50 flex items-center gap-2"
-                style={{ backgroundColor: '#0F8B8D' }}
+                className="flex items-center gap-2 rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50 hover:bg-teal-700"
               >
                 {(addSaving || addExcelProcessing) && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                 {addSaving ? 'Guardando...' : addExcelProcessing ? 'Procesando Excel...' : 'Crear hospital'}
@@ -567,8 +655,7 @@ export function Hospitales() {
                   </button>
                   <button
                     onClick={() => navigate(`/hospitales/${h.id}/dashboard`)}
-                    className="w-full sm:flex-1 flex items-center justify-center space-x-1 px-3 py-2 text-xs font-medium text-white rounded-lg transition-colors"
-                    style={{ backgroundColor: '#0F8B8D' }}
+                    className="flex w-full items-center justify-center space-x-1 rounded-lg bg-teal-600 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-teal-700 sm:flex-1"
                   >
                     <LayoutDashboard className="w-3.5 h-3.5" />
                     <span>Ver Dashboard</span>
@@ -606,9 +693,9 @@ export function Hospitales() {
   // RENDER: VIEW B — Hospital detail
   // ─────────────────────────────────────────────────────────────────────────
 
-  const filteredFiles = filesInRange(hospitalFiles, dateRange);
+  const filteredFiles = filesInRange(activeHospitalFiles, dateRange);
   const totalRecordsInRange = filteredFiles.reduce((sum, f) => sum + f.record_count, 0);
-  const totalRecordsAll = hospitalFiles.reduce((sum, f) => sum + f.record_count, 0);
+  const totalRecordsAll = activeHospitalFiles.reduce((sum, f) => sum + f.record_count, 0);
 
   // Date span for summary bar
   const sortedForSpan = [...filteredFiles].sort(
@@ -640,7 +727,7 @@ export function Hospitales() {
           <span className="text-sm">Hospitales</span>
         </button>
         <span className="text-gray-300">/</span>
-        <span className="text-sm font-semibold" style={{ color: '#0B3C5D' }}>
+        <span className="text-sm font-semibold text-slate-900 dark:text-white">
           {activeHospital?.name}
         </span>
       </div>
@@ -653,10 +740,9 @@ export function Hospitales() {
             onClick={() => setActiveTab(tab)}
             className={`px-5 py-2.5 text-sm font-medium border-b-2 transition-colors ${
               activeTab === tab
-                ? 'border-current'
+                ? 'border-teal-600 text-teal-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
-            style={activeTab === tab ? { color: '#0F8B8D', borderColor: '#0F8B8D' } : {}}
           >
             {tab === 'info' ? 'Información' : 'Archivos Excel'}
           </button>
@@ -745,8 +831,7 @@ export function Hospitales() {
             <button
               onClick={handleSaveEdit}
               disabled={editSaving}
-              className="px-4 py-2 text-sm font-medium text-white rounded-lg disabled:opacity-50"
-              style={{ backgroundColor: '#0F8B8D' }}
+              className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50 hover:bg-teal-700"
             >
               {editSaving ? 'Guardando...' : 'Guardar cambios'}
             </button>
@@ -809,7 +894,7 @@ export function Hospitales() {
             </p>
             <p className="text-sm text-gray-400 mt-1">
               o{' '}
-              <span className="underline" style={{ color: '#0F8B8D' }}>
+              <span className="text-teal-600 underline">
                 haz clic para seleccionar
               </span>
             </p>
@@ -880,8 +965,7 @@ export function Hospitales() {
                   {pf.status === 'idle' && (
                     <button
                       onClick={() => handleUploadFile(pf.id)}
-                      className="px-3 py-1 text-xs font-medium text-white rounded-lg shrink-0"
-                      style={{ backgroundColor: '#0F8B8D' }}
+                      className="shrink-0 rounded-lg bg-teal-600 px-3 py-1 text-xs font-medium text-white hover:bg-teal-700"
                     >
                       Cargar
                     </button>
@@ -938,7 +1022,7 @@ export function Hospitales() {
                   Archivos cargados
                 </span>
                 <span className="px-2 py-0.5 text-xs font-medium bg-gray-200 text-gray-600 rounded-full">
-                  {hospitalFiles.length}
+                  {activeHospitalFiles.length}
                 </span>
               </div>
 
@@ -950,10 +1034,9 @@ export function Hospitales() {
                     onClick={() => setDateRange(r)}
                     className={`px-3 py-1 text-xs font-medium rounded-lg transition-colors border ${
                       dateRange === r
-                        ? 'text-white border-transparent'
+                        ? 'border-teal-600 bg-teal-600 text-white'
                         : 'text-gray-600 border-gray-200 hover:bg-gray-100'
                     }`}
-                    style={dateRange === r ? { backgroundColor: '#0F8B8D', borderColor: '#0F8B8D' } : {}}
                   >
                     {RANGE_LABELS[r]}
                   </button>
@@ -962,7 +1045,17 @@ export function Hospitales() {
             </div>
 
             {/* Table or empty state */}
-            {hospitalFiles.length === 0 ? (
+            {activeFilesLoading ? (
+              <div className="flex flex-col items-center py-12">
+                <Loader2 className="mb-3 h-10 w-10 animate-spin text-gray-300" />
+                <p className="text-sm font-medium text-gray-500">Cargando archivos del hospital...</p>
+              </div>
+            ) : activeFilesError ? (
+              <div className="flex flex-col items-center py-12">
+                <XCircle className="mb-3 h-10 w-10 text-red-300" />
+                <p className="text-sm font-medium text-red-600">{activeFilesError}</p>
+              </div>
+            ) : activeHospitalFiles.length === 0 ? (
               <div className="flex flex-col items-center py-12">
                 <Upload className="w-10 h-10 text-gray-300 mb-3" />
                 <p className="text-sm font-medium text-gray-500">
@@ -985,7 +1078,7 @@ export function Hospitales() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {hospitalFiles.map((f) => {
+                  {activeHospitalFiles.map((f) => {
                     const inRange = filteredFiles.some((fr) => fr.id === f.id);
                     const isConfirming = deleteConfirmId === f.id;
                     return (
@@ -1045,11 +1138,11 @@ export function Hospitales() {
                   <span className="font-medium text-gray-700">{filteredFiles.length}</span> archivo{filteredFiles.length !== 1 ? 's' : ''}
                   {' '}·{' '}
                   <span className="font-medium text-gray-700">{totalRecordsInRange.toLocaleString()}</span> registros en rango
-                  {filteredFiles.length !== hospitalFiles.length && (
+                  {filteredFiles.length !== activeHospitalFiles.length && (
                     <span className="text-gray-400"> (de {totalRecordsAll.toLocaleString()} totales)</span>
                   )}
                 </span>
-                <span className="font-medium" style={{ color: '#0B3C5D' }}>
+                <span className="font-medium text-slate-900 dark:text-white">
                   {dateSpan}
                 </span>
               </div>
