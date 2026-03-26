@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useMemo, useRef } from 'react';
 import {
   ArrowLeft,
   Plus,
@@ -112,6 +112,13 @@ function validateHospitalForm({
   return null;
 }
 
+function normalizeText(value: string | null | undefined): string {
+  return (value ?? '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
+
 export function Hospitales() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -131,6 +138,7 @@ export function Hospitales() {
 
   // Add hospital form (VIEW A)
   const [showAddForm, setShowAddForm] = useState(false);
+  const [hospitalSearch, setHospitalSearch] = useState('');
   const [addName, setAddName] = useState('');
   const [addCity, setAddCity] = useState('');
   const [addDept, setAddDept] = useState('');
@@ -180,6 +188,24 @@ export function Hospitales() {
     statuses: uploadStatuses,
     refresh: refreshUploadStatuses,
   } = useHospitalUploadStatuses(hospitals.map((hospital) => hospital.id));
+
+  const filteredHospitals = useMemo(() => {
+    const query = normalizeText(hospitalSearch.trim());
+
+    if (!query) {
+      return hospitals;
+    }
+
+    return hospitals.filter((hospital) =>
+      [
+        hospital.name,
+        hospital.city,
+        hospital.department,
+        hospital.contact_name ?? '',
+        hospital.contact_email ?? '',
+      ].some((value) => normalizeText(value).includes(query)),
+    );
+  }, [hospitalSearch, hospitals]);
 
   const openDetail = useCallback((h: Hospital) => {
     setSelectedHospitalObj(h);
@@ -348,8 +374,28 @@ export function Hospitales() {
 
   const addPendingFiles = (files: FileList | File[]) => {
     const now = new Date();
-    const newItems: PendingFile[] = Array.from(files)
-      .filter((f) => /\.(xlsx|xls|csv)$/i.test(f.name))
+    const incomingFiles = Array.from(files);
+    const invalidFiles = incomingFiles.filter((file) => !/\.(xlsx|xls|csv)$/i.test(file.name));
+
+    if (invalidFiles.length > 0) {
+      toast.error('Solo se permiten archivos Excel o CSV.');
+    }
+
+    const existingKeys = new Set(
+      pendingFiles.map((pendingFile) => `${pendingFile.file.name}-${pendingFile.file.size}`),
+    );
+
+    const newItems: PendingFile[] = incomingFiles
+      .filter((file) => /\.(xlsx|xls|csv)$/i.test(file.name))
+      .filter((file) => {
+        const fileKey = `${file.name}-${file.size}`;
+        if (existingKeys.has(fileKey)) {
+          return false;
+        }
+
+        existingKeys.add(fileKey);
+        return true;
+      })
       .map((file) => ({
         id: Math.random().toString(36).slice(2),
         file,
@@ -358,6 +404,12 @@ export function Hospitales() {
         status: 'idle',
         message: '',
       }));
+
+    if (newItems.length === 0 && incomingFiles.length > 0 && invalidFiles.length !== incomingFiles.length) {
+      toast.error('Esos archivos ya estaban en la cola.');
+      return;
+    }
+
     setPendingFiles((prev) => [...prev, ...newItems]);
   };
 
@@ -446,7 +498,10 @@ export function Hospitales() {
   };
 
   const handleUpdateExcel = async (file: File, hospitalId: string) => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      toast.error('Debes iniciar sesion para actualizar archivos Excel.');
+      return;
+    }
     setUpdatingExcelId(hospitalId);
     toast.info('Procesando Excel...');
     const result = await processAndSaveExcel(hospitalId, file, user.id);
@@ -490,6 +545,32 @@ export function Hospitales() {
             </button>
           )}
         </div>
+
+        {hospitals.length > 0 && (
+          <div className="mb-6 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto_auto]">
+              <label className="flex items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2">
+                <Building2 className="h-4 w-4 text-gray-400" />
+                <input
+                  value={hospitalSearch}
+                  onChange={(event) => setHospitalSearch(event.target.value)}
+                  placeholder="Buscar por hospital, ciudad, departamento o responsable"
+                  className="w-full bg-transparent text-sm text-gray-700 outline-none placeholder:text-gray-400"
+                />
+              </label>
+              <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-2">
+                <p className="text-xs text-gray-500">Hospitales visibles</p>
+                <p className="text-sm font-semibold text-gray-900">{filteredHospitals.length}</p>
+              </div>
+              <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-2">
+                <p className="text-xs text-gray-500">Con datos Excel</p>
+                <p className="text-sm font-semibold text-gray-900">
+                  {filteredHospitals.filter((hospital) => Boolean(uploadStatuses[hospital.id])).length}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Inline Add Form */}
         {showAddForm && (
@@ -605,9 +686,18 @@ export function Hospitales() {
               action={canCreate ? { label: 'Crear mi primer hospital', onClick: () => setShowAddForm(true) } : undefined}
             />
           </div>
+        ) : filteredHospitals.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-gray-300 bg-white dark:border-gray-700 dark:bg-gray-900">
+            <EmptyState
+              icon={Building2}
+              title="No hay hospitales con esa búsqueda"
+              description="Ajusta el texto de búsqueda para volver a ver hospitales registrados."
+              action={{ label: 'Limpiar búsqueda', onClick: () => setHospitalSearch('') }}
+            />
+          </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {hospitals.map((h) => (
+            {filteredHospitals.map((h) => (
               <div
                 key={h.id}
                 className="bg-white border border-gray-200 rounded-xl shadow-sm p-6 flex flex-col"
@@ -913,14 +1003,42 @@ export function Hospitales() {
             />
           </div>
 
+          <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 p-4">
+            <p className="text-sm font-semibold text-blue-900">Como usar esta carga</p>
+            <p className="mt-1 text-sm text-blue-700">
+              Agrega los archivos del periodo, revisa mes y ano antes de subirlos y luego confirma la carga.
+              La tabla inferior solo muestra archivos del rango seleccionado.
+            </p>
+          </div>
           {/* ── Queue of pending files ── */}
           {pendingFiles.length > 0 && (
             <div className="bg-white border border-gray-200 rounded-xl mb-6 overflow-hidden">
               <div className="px-4 py-3 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
-                <span className="text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                  Archivos pendientes
-                </span>
-                <span className="text-xs text-gray-400">{pendingFiles.length} archivo{pendingFiles.length !== 1 ? 's' : ''}</span>
+                <div>
+                  <span className="text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                    Archivos pendientes
+                  </span>
+                  <p className="mt-1 text-xs text-gray-400">
+                    {pendingFiles.filter((pendingFile) => pendingFile.status === 'idle').length} listos para cargar
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {pendingFiles.some((pendingFile) => pendingFile.status === 'idle') && (
+                    <button
+                      onClick={() => {
+                        pendingFiles
+                          .filter((pendingFile) => pendingFile.status === 'idle')
+                          .forEach((pendingFile) => {
+                            void handleUploadFile(pendingFile.id);
+                          });
+                      }}
+                      className="rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-teal-700"
+                    >
+                      Cargar todo
+                    </button>
+                  )}
+                  <span className="text-xs text-gray-400">{pendingFiles.length} archivo{pendingFiles.length !== 1 ? 's' : ''}</span>
+                </div>
               </div>
               {pendingFiles.map((pf) => (
                 <div
@@ -1069,6 +1187,16 @@ export function Hospitales() {
                   Usa la zona de arrastre de arriba para subir archivos
                 </p>
               </div>
+            ) : filteredFiles.length === 0 ? (
+              <div className="flex flex-col items-center py-12">
+                <FileSpreadsheet className="mb-3 h-10 w-10 text-gray-300" />
+                <p className="text-sm font-medium text-gray-500">
+                  No hay archivos en el periodo seleccionado
+                </p>
+                <p className="mt-1 text-xs text-gray-400">
+                  Cambia el rango o carga un archivo correspondiente a ese periodo.
+                </p>
+              </div>
             ) : (
               <table className="w-full">
                 <thead className="bg-gray-50 border-b border-gray-200">
@@ -1082,13 +1210,12 @@ export function Hospitales() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {activeHospitalFiles.map((f) => {
-                    const inRange = filteredFiles.some((fr) => fr.id === f.id);
+                  {filteredFiles.map((f) => {
                     const isConfirming = deleteConfirmId === f.id;
                     return (
                       <tr
                         key={f.id}
-                        className={`transition-colors hover:bg-gray-50 ${inRange ? '' : 'opacity-40'}`}
+                        className="transition-colors hover:bg-gray-50"
                       >
                         <td className="px-4 py-3 text-sm text-gray-700">{MONTH_NAMES[f.month - 1]}</td>
                         <td className="px-4 py-3 text-sm text-gray-700">{f.year}</td>
