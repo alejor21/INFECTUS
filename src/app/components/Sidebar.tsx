@@ -1,32 +1,28 @@
+import { useState } from 'react';
 import {
-  LayoutDashboard,
   Activity,
-  Pill,
-  Shield,
-  FileText,
-  Settings,
-  Building2,
-  GitCompare,
-  Bell,
-  X,
-  UserRound,
-  Calculator,
-  ClipboardCheck,
   BarChart3,
-  LogOut,
+  Bell,
+  Building2,
   ChevronDown,
+  ClipboardCheck,
+  FileText,
+  GitCompare,
   Globe,
+  LayoutDashboard,
   Loader2,
+  LogOut,
+  Pill,
+  Settings,
+  Shield,
+  X,
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router';
-import { useState } from 'react';
-import { useAlertBadge } from '../../hooks/useAlerts';
+import { toast } from 'sonner';
 import { useAuth } from '../../contexts/AuthContext';
 import { useHospitalContext } from '../../contexts/HospitalContext';
+import { useAlertBadge } from '../../hooks/useAlerts';
 import { signOut } from '../../lib/supabase/auth';
-import { toast } from 'sonner';
-
-// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface NavItem {
   icon: React.ComponentType<{ className?: string }>;
@@ -46,15 +42,13 @@ interface SidebarProps {
   onClose?: () => void;
 }
 
-// ─── Component ────────────────────────────────────────────────────────────────
-
 export function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const unreadAlerts = useAlertBadge();
   const { profile } = useAuth();
   const { selectedHospitalObj, setSelectedHospitalObj, hospitals } = useHospitalContext();
-  
+
   const [showHospitalDropdown, setShowHospitalDropdown] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
 
@@ -66,13 +60,13 @@ export function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
           icon: LayoutDashboard,
           label: 'Dashboard',
           path: '/dashboard',
-          title: 'Ver métricas y resumen del programa PROA',
+          title: 'Ver metricas y resumen del programa PROA',
         },
         {
           icon: BarChart3,
-          label: 'Analíticas',
+          label: 'Analiticas',
           path: '/indicadores-proa',
-          title: 'Analíticas y métricas del programa',
+          title: 'Analiticas y metricas del programa',
         },
         {
           icon: ClipboardCheck,
@@ -88,20 +82,20 @@ export function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
         },
         {
           icon: Settings,
-          label: 'Configuración',
+          label: 'Configuracion',
           path: '/configuracion',
-          title: 'Configuración del sistema',
+          title: 'Configuracion del sistema',
         },
       ],
     },
     {
-      label: 'ANÁLISIS',
+      label: 'ANALISIS',
       items: [
         {
           icon: Pill,
-          label: 'Antibióticos',
+          label: 'Antibioticos',
           path: '/consumo-antibioticos',
-          title: 'Consumo de antibióticos (DDD/DOT)',
+          title: 'Consumo de antibioticos (DDD/DOT)',
         },
         {
           icon: Shield,
@@ -113,7 +107,7 @@ export function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
           icon: GitCompare,
           label: 'Comparativa',
           path: '/comparativa',
-          title: 'Comparar métricas',
+          title: 'Comparar metricas',
         },
         {
           icon: FileText,
@@ -142,18 +136,25 @@ export function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
   };
 
   function itemIsActive(path: string): boolean {
-    if (location.pathname === path) return true;
-    if (path.length > 1 && location.pathname.startsWith(path + '/')) return true;
+    if (location.pathname === path) {
+      return true;
+    }
+
+    if (path.length > 1 && location.pathname.startsWith(`${path}/`)) {
+      return true;
+    }
+
     return false;
   }
 
   const handleSignOut = async () => {
     setIsSigningOut(true);
+
     try {
       await signOut();
       navigate('/login', { replace: true });
     } catch {
-      toast.error('Error al cerrar sesión');
+      toast.error('Error al cerrar sesion');
       setIsSigningOut(false);
     }
   };
@@ -163,7 +164,7 @@ export function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
     (profile?.full_name
       ? profile.full_name
           .split(' ')
-          .map((n) => n[0])
+          .map((name) => name[0])
           .join('')
           .slice(0, 2)
           .toUpperCase()
@@ -171,98 +172,107 @@ export function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
 
   const roleLabels: Record<string, string> = {
     administrador: 'Administrador',
-    infectologo: 'Infectólogo',
-    medico: 'Médico',
+    infectologo: 'Infectologo',
+    medico: 'Medico',
     visor: 'Visor',
   };
 
   return (
     <aside
-      className={`w-64 bg-white dark:bg-gray-950 border-r border-gray-200 dark:border-gray-800 flex flex-col h-screen fixed left-0 top-0 z-40 transition-transform duration-300 ease-in-out ${
+      className={`fixed left-0 top-0 z-40 flex h-screen w-64 flex-col border-r border-gray-200 bg-white transition-transform duration-300 ease-in-out dark:border-gray-800 dark:bg-gray-950 ${
         isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
       }`}
     >
-      {/* Logo */}
-      <div className="h-16 flex items-center px-5 border-b border-gray-200 dark:border-gray-800 shrink-0">
-        <div className="flex items-center justify-between w-full">
-          <Link to="/dashboard" className="flex items-center gap-3 group">
-            <div className="w-9 h-9 rounded-xl bg-teal-600 flex items-center justify-center shadow-sm group-hover:shadow-md transition-shadow">
-              <Activity className="w-5 h-5 text-white" />
+      <div className="flex h-16 items-center border-b border-gray-200 px-5 dark:border-gray-800">
+        <div className="flex w-full items-center justify-between">
+          <Link to="/dashboard" className="group flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-teal-600 shadow-sm transition-shadow group-hover:shadow-md">
+              <Activity className="h-5 w-5 text-white" />
             </div>
-            <span className="font-bold text-lg tracking-tight text-gray-900 dark:text-white">
-              INFECTUS
-            </span>
+            <span className="text-lg font-bold tracking-tight text-gray-900 dark:text-white">INFECTUS</span>
           </Link>
 
           <button
             onClick={onClose}
-            className="lg:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 transition-colors"
-            aria-label="Cerrar menú"
+            className="rounded-lg p-2 text-gray-500 transition-colors hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800 lg:hidden"
+            aria-label="Cerrar menu"
           >
-            <X className="w-5 h-5" />
+            <X className="h-5 w-5" />
           </button>
         </div>
       </div>
 
-      {/* Hospital Selector */}
-      <div className="px-3 py-3 border-b border-gray-200 dark:border-gray-800">
+      <div className="border-b border-gray-200 px-3 py-3 dark:border-gray-800">
         <div className="relative">
           <button
-            onClick={() => setShowHospitalDropdown(!showHospitalDropdown)}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 border border-gray-200 dark:border-gray-800 transition-colors"
+            onClick={() => setShowHospitalDropdown((value) => !value)}
+            className="flex w-full items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 transition-colors hover:bg-gray-100 dark:border-gray-800 dark:bg-gray-900 dark:hover:bg-gray-800"
           >
             {selectedHospitalObj ? (
-              <Building2 className="w-4 h-4 text-teal-600 shrink-0" />
+              <Building2 className="h-4 w-4 shrink-0 text-teal-600" />
             ) : (
-              <Globe className="w-4 h-4 text-gray-400 shrink-0" />
+              <Globe className="h-4 w-4 shrink-0 text-gray-400" />
             )}
-            <span className="flex-1 text-left text-sm font-medium text-gray-700 dark:text-gray-200 truncate">
+            <span className="flex-1 truncate text-left text-sm font-medium text-gray-700 dark:text-gray-200">
               {selectedHospitalObj?.name ?? 'Todos los hospitales'}
             </span>
-            <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${showHospitalDropdown ? 'rotate-180' : ''}`} />
+            <ChevronDown
+              className={`h-4 w-4 text-gray-400 transition-transform ${showHospitalDropdown ? 'rotate-180' : ''}`}
+            />
           </button>
 
-          {showHospitalDropdown && (
+          {showHospitalDropdown ? (
             <>
               <div className="fixed inset-0 z-10" onClick={() => setShowHospitalDropdown(false)} />
-              <div className="absolute left-0 right-0 top-full mt-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl shadow-lg overflow-hidden z-20 max-h-64 overflow-y-auto">
+              <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-64 overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-lg dark:border-gray-800 dark:bg-gray-900">
                 <button
-                  onClick={() => { setSelectedHospitalObj(null); setShowHospitalDropdown(false); }}
-                  className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors ${
-                    !selectedHospitalObj ? 'bg-teal-50 dark:bg-teal-900/20 text-teal-700 dark:text-teal-400' : 'text-gray-700 dark:text-gray-300'
+                  onClick={() => {
+                    setSelectedHospitalObj(null);
+                    setShowHospitalDropdown(false);
+                  }}
+                  className={`flex w-full items-center gap-3 px-4 py-2.5 text-sm transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 ${
+                    !selectedHospitalObj
+                      ? 'bg-teal-50 text-teal-700 dark:bg-teal-900/20 dark:text-teal-400'
+                      : 'text-gray-700 dark:text-gray-300'
                   }`}
                 >
-                  <Globe className="w-4 h-4 shrink-0" />
+                  <Globe className="h-4 w-4 shrink-0" />
                   <span className="font-medium">Todos los hospitales</span>
                 </button>
-                {hospitals.map((h) => (
+
+                {hospitals.map((hospital) => (
                   <button
-                    key={h.id}
-                    onClick={() => { setSelectedHospitalObj(h); setShowHospitalDropdown(false); }}
-                    className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors ${
-                      selectedHospitalObj?.id === h.id ? 'bg-teal-50 dark:bg-teal-900/20 text-teal-700 dark:text-teal-400' : 'text-gray-700 dark:text-gray-300'
+                    key={hospital.id}
+                    onClick={() => {
+                      setSelectedHospitalObj(hospital);
+                      setShowHospitalDropdown(false);
+                    }}
+                    className={`flex w-full items-center gap-3 px-4 py-2.5 text-sm transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 ${
+                      selectedHospitalObj?.id === hospital.id
+                        ? 'bg-teal-50 text-teal-700 dark:bg-teal-900/20 dark:text-teal-400'
+                        : 'text-gray-700 dark:text-gray-300'
                     }`}
                   >
-                    <Building2 className="w-4 h-4 shrink-0" />
-                    <div className="text-left truncate">
-                      <div className="font-medium truncate">{h.name}</div>
-                      <div className="text-xs text-gray-500 dark:text-gray-500">{h.city}</div>
+                    <Building2 className="h-4 w-4 shrink-0" />
+                    <div className="truncate text-left">
+                      <div className="truncate font-medium">{hospital.name}</div>
+                      <div className="text-xs text-gray-500 dark:text-gray-500">{hospital.city}</div>
                     </div>
                   </button>
                 ))}
               </div>
             </>
-          )}
+          ) : null}
         </div>
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 px-3 py-4 overflow-y-auto">
-        {navGroups.map((group, groupIdx) => (
-          <div key={group.label} className={groupIdx > 0 ? 'mt-6' : ''}>
-            <p className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide px-3 mb-2">
+      <nav className="flex-1 overflow-y-auto px-3 py-4">
+        {navGroups.map((group, groupIndex) => (
+          <div key={group.label} className={groupIndex > 0 ? 'mt-6' : ''}>
+            <p className="mb-2 px-3 text-xs font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
               {group.label}
             </p>
+
             <div className="space-y-1">
               {group.items.map((item) => {
                 const active = itemIsActive(item.path);
@@ -275,19 +285,21 @@ export function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
                     onClick={onClose}
                     id={TOUR_IDS[item.path]}
                     title={item.title}
-                    className={`group w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 ${
+                    className={`group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-200 ${
                       active
-                        ? 'bg-teal-600/10 text-teal-600 dark:text-teal-400 border-l-2 border-teal-600 ml-0'
-                        : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800/50 hover:text-gray-900 dark:hover:text-gray-200'
+                        ? 'ml-0 border-l-2 border-teal-600 bg-teal-600/10 text-teal-600 dark:text-teal-400'
+                        : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800/50 dark:hover:text-gray-200'
                     }`}
                   >
-                    <item.icon className={`w-5 h-5 shrink-0 ${active ? '' : 'group-hover:scale-105 transition-transform'}`} />
-                    <span className="text-sm font-medium flex-1">{item.label}</span>
-                    {badge > 0 && (
-                      <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-red-500 text-white text-xs font-bold">
+                    <item.icon
+                      className={`h-5 w-5 shrink-0 ${active ? '' : 'transition-transform group-hover:scale-105'}`}
+                    />
+                    <span className="flex-1 text-sm font-medium">{item.label}</span>
+                    {badge > 0 ? (
+                      <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-bold text-white">
                         {badge > 99 ? '99+' : badge}
                       </span>
-                    )}
+                    ) : null}
                   </Link>
                 );
               })}
@@ -296,19 +308,18 @@ export function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
         ))}
       </nav>
 
-      {/* User section */}
-      <div className="p-3 border-t border-gray-200 dark:border-gray-800 shrink-0">
+      <div className="shrink-0 border-t border-gray-200 p-3 dark:border-gray-800">
         <div className="rounded-xl bg-gray-50 p-3 dark:bg-gray-900">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-full bg-teal-600 flex items-center justify-center text-white text-sm font-semibold shrink-0">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-teal-600 text-sm font-semibold text-white">
               {initials}
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium text-gray-900 dark:text-white">
                 {profile?.full_name ?? 'Usuario'}
               </p>
-              <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                {roleLabels[profile?.role ?? ''] ?? profile?.role ?? '—'}
+              <p className="truncate text-xs text-gray-500 dark:text-gray-400">
+                {roleLabels[profile?.role ?? ''] ?? profile?.role ?? '-'}
               </p>
             </div>
           </div>
@@ -317,10 +328,10 @@ export function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
             onClick={handleSignOut}
             disabled={isSigningOut}
             className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 disabled:opacity-50 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-200 dark:hover:bg-gray-800"
-            title="Cerrar sesión"
+            title="Cerrar sesion"
           >
-            {isSigningOut ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogOut className="w-4 h-4" />}
-            Cerrar sesión
+            {isSigningOut ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />}
+            Cerrar sesion
           </button>
         </div>
       </div>
