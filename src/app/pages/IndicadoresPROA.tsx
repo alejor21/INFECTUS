@@ -22,6 +22,7 @@ import {
   getServicioAnalysis,
   getTipoIntervencionAnalysis,
 } from '../../lib/analytics/proaCommittee';
+import { exportAllChartsAsPNG, exportChartAsPNG, exportChartsPDF } from '../../utils/exportCharts';
 import type { InterventionRecord } from '../../types';
 import { AdherenciaChart } from '../components/charts/proa/AdherenciaChart';
 import { ConductasChart } from '../components/charts/proa/ConductasChart';
@@ -202,10 +203,38 @@ export function IndicadoresPROA() {
   });
 
   const committeeSubtitle = `${getCommitteeHospitalLabel(committeeHospitalName)} (n=${committeeScopedRecords.length})`;
+  const committeePeriodLabel = COMMITTEE_RANGE_LABEL[committeeRange];
   const adherenciaAnalysis = useMemo(() => getAdherenciaAnalysis(adherenciaData), [adherenciaData]);
   const conductasAnalysis = useMemo(() => getConductasAnalysis(conductasData), [conductasData]);
   const servicioAnalysis = useMemo(() => getServicioAnalysis(servicioData), [servicioData]);
   const tipoAnalysis = useMemo(() => getTipoIntervencionAnalysis(tipoData), [tipoData]);
+  const committeePdfData = useMemo(
+    () => ({
+      charts: [
+        {
+          id: 'proa-chart-tipo-intervencion',
+          title: 'Tipo de Intervenciones PROA',
+          analysis: tipoAnalysis,
+        },
+        {
+          id: 'proa-chart-servicio',
+          title: 'Intervenciones por Servicio',
+          analysis: servicioAnalysis,
+        },
+        {
+          id: 'proa-chart-conductas',
+          title: 'Conductas de Infectologia por Servicio',
+          analysis: conductasAnalysis,
+        },
+        {
+          id: 'proa-chart-adherencia',
+          title: 'Adherencia a las Intervenciones',
+          analysis: adherenciaAnalysis,
+        },
+      ],
+    }),
+    [adherenciaAnalysis, conductasAnalysis, servicioAnalysis, tipoAnalysis],
+  );
 
   const proa003 = pct(
     records.filter((record) => (record.tipoIntervencion ?? '').trim().toUpperCase() === 'IC').length,
@@ -321,6 +350,21 @@ export function IndicadoresPROA() {
       description: 'Resume si el tiempo total de terapia se mantiene dentro del rango esperado del programa.',
     },
   ];
+
+  async function handleIndividualExport(elementId: string, chartLabel: string) {
+    const scope = getCommitteeHospitalLabel(committeeHospitalName);
+    await exportChartAsPNG(elementId, `${scope}_${chartLabel}_${committeePeriodLabel}`);
+  }
+
+  async function handleExportAllCharts() {
+    const scope = getCommitteeHospitalLabel(committeeHospitalName);
+    await exportAllChartsAsPNG(scope, committeePeriodLabel);
+  }
+
+  async function handleExportPdf() {
+    const scope = getCommitteeHospitalLabel(committeeHospitalName);
+    await exportChartsPDF(scope, committeePeriodLabel, committeePdfData);
+  }
 
   function handlePendingExport(label: string) {
     toast.info(`${label} se habilitara en el siguiente bloque.`);
@@ -532,7 +576,9 @@ export function IndicadoresPROA() {
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
-                onClick={() => handlePendingExport('La exportacion de imagenes')}
+                onClick={() => {
+                  void handleExportAllCharts();
+                }}
                 className="inline-flex min-h-[44px] items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800"
               >
                 <Download className="h-4 w-4" />
@@ -540,7 +586,9 @@ export function IndicadoresPROA() {
               </button>
               <button
                 type="button"
-                onClick={() => handlePendingExport('La exportacion PDF')}
+                onClick={() => {
+                  void handleExportPdf();
+                }}
                 className="inline-flex min-h-[44px] items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800"
               >
                 <FileText className="h-4 w-4" />
@@ -566,7 +614,9 @@ export function IndicadoresPROA() {
             data={tipoData}
             analysis={tipoAnalysis}
             isLoading={proaChartsLoading}
-            onExport={() => handlePendingExport('La exportacion individual')}
+            onExport={() => {
+              void handleIndividualExport('proa-chart-tipo-intervencion', 'TipoIntervencion');
+            }}
           />
           <DistribucionServicioChart
             cardId="proa-chart-servicio"
@@ -575,7 +625,9 @@ export function IndicadoresPROA() {
             data={servicioData}
             analysis={servicioAnalysis}
             isLoading={proaChartsLoading}
-            onExport={() => handlePendingExport('La exportacion individual')}
+            onExport={() => {
+              void handleIndividualExport('proa-chart-servicio', 'PorServicio');
+            }}
           />
           <ConductasChart
             cardId="proa-chart-conductas"
@@ -584,7 +636,9 @@ export function IndicadoresPROA() {
             data={conductasData}
             analysis={conductasAnalysis}
             isLoading={proaChartsLoading}
-            onExport={() => handlePendingExport('La exportacion individual')}
+            onExport={() => {
+              void handleIndividualExport('proa-chart-conductas', 'Conductas');
+            }}
           />
           <AdherenciaChart
             cardId="proa-chart-adherencia"
@@ -593,7 +647,9 @@ export function IndicadoresPROA() {
             data={adherenciaData}
             analysis={adherenciaAnalysis}
             isLoading={proaChartsLoading}
-            onExport={() => handlePendingExport('La exportacion individual')}
+            onExport={() => {
+              void handleIndividualExport('proa-chart-adherencia', 'Adherencia');
+            }}
           />
         </div>
       </div>
