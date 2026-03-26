@@ -15,6 +15,7 @@ import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import { useAnalytics } from '../../hooks/useAnalytics';
 import { useProaCharts } from '../../hooks/useProaCharts';
+import { useAuth } from '../../contexts/AuthContext';
 import {
   getAdherenciaAnalysis,
   getCommitteeHospitalLabel,
@@ -22,6 +23,7 @@ import {
   getServicioAnalysis,
   getTipoIntervencionAnalysis,
 } from '../../lib/analytics/proaCommittee';
+import { generateProaPPTX } from '../../utils/generatePPTX';
 import { exportAllChartsAsPNG, exportChartAsPNG, exportChartsPDF } from '../../utils/exportCharts';
 import type { InterventionRecord } from '../../types';
 import { AdherenciaChart } from '../components/charts/proa/AdherenciaChart';
@@ -150,6 +152,7 @@ function getStatusText(value: number, objective: number, lowIsBetter = false): s
 
 export function IndicadoresPROA() {
   const navigate = useNavigate();
+  const { profile } = useAuth();
   const { allRawRecords, dateRange, hospitals, selectedHospitalObj } = useHospitalContext();
   const { kpis, monthlyCompliance, records, loading, cultivosPreRate, avgTherapyDays } = useAnalytics();
 
@@ -364,6 +367,23 @@ export function IndicadoresPROA() {
   async function handleExportPdf() {
     const scope = getCommitteeHospitalLabel(committeeHospitalName);
     await exportChartsPDF(scope, committeePeriodLabel, committeePdfData);
+  }
+
+  async function handleExportPptx() {
+    const scope = getCommitteeHospitalLabel(committeeHospitalName);
+    const authorLabel = profile?.full_name
+      ? `${profile.full_name} - ${profile.role ?? 'Equipo PROA'}`
+      : 'Equipo PROA';
+
+    await generateProaPPTX({
+      hospitalName: scope,
+      period: committeePeriodLabel,
+      authors: [authorLabel],
+      adherenciaData,
+      conductasData,
+      servicioData,
+      tipoData,
+    });
   }
 
   function handlePendingExport(label: string) {
@@ -596,7 +616,9 @@ export function IndicadoresPROA() {
               </button>
               <button
                 type="button"
-                onClick={() => handlePendingExport('La generacion de PowerPoint')}
+                onClick={() => {
+                  void handleExportPptx();
+                }}
                 className="inline-flex min-h-[44px] items-center gap-2 rounded-xl bg-teal-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-teal-700"
               >
                 <BarChart3 className="h-4 w-4" />
