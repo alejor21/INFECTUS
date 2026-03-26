@@ -13,12 +13,24 @@ export function useHospitalUploadStatuses(hospitalIds: string[]) {
   const [statuses, setStatuses] = useState<Record<string, HospitalUploadStatus>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const hospitalIdsKey = hospitalIds.join('|');
 
-  const refresh = useCallback(async () => {
-    if (hospitalIds.length === 0) {
+  const refresh = useCallback(async (isActive?: () => boolean) => {
+    const ids = hospitalIdsKey.split('|').filter(Boolean);
+    const canCommit = isActive ?? (() => true);
+
+    if (ids.length === 0) {
+      if (!canCommit()) {
+        return;
+      }
+
       setStatuses({});
       setError(null);
       setLoading(false);
+      return;
+    }
+
+    if (!canCommit()) {
       return;
     }
 
@@ -26,18 +38,35 @@ export function useHospitalUploadStatuses(hospitalIds: string[]) {
     setError(null);
 
     try {
-      const data = await getHospitalUploadStatuses(hospitalIds);
+      const data = await getHospitalUploadStatuses(ids);
+      if (!canCommit()) {
+        return;
+      }
+
       setStatuses(data);
     } catch (errorValue: unknown) {
+      if (!canCommit()) {
+        return;
+      }
+
       setStatuses({});
       setError(getErrorMessage(errorValue));
     } finally {
-      setLoading(false);
+      if (canCommit()) {
+        setLoading(false);
+      }
     }
-  }, [hospitalIds]);
+  }, [hospitalIdsKey]);
 
   useEffect(() => {
-    void refresh();
+    let cancelled = false;
+    const isActive = () => !cancelled;
+
+    void refresh(isActive);
+
+    return () => {
+      cancelled = true;
+    };
   }, [refresh]);
 
   return {
