@@ -5,13 +5,14 @@ import { useDataManagement } from '../../hooks/useDataManagement';
 import { useAuth, type Profile } from '../../contexts/AuthContext';
 import { getAllProfiles, updateProfile, signUp } from '../../lib/supabase/auth';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { ExcelUploadSummary } from '../components/ExcelUploadSummary';
 
 type UserRole = 'administrador' | 'infectologo' | 'medico' | 'visor';
 
 export function Configuracion() {
   const [activeTab, setActiveTab] = useState('general');
   const [hospitalName, setHospitalName] = useState('Hospital General Central');
-  const { uploadFile, status, result, error } = useFileUpload();
+  const { uploadFile, status, result, parseResult, error } = useFileUpload();
   const {
     hospitals: hospitalStats,
     loading: statsLoading,
@@ -36,6 +37,7 @@ export function Configuracion() {
   const [editRole, setEditRole] = useState<UserRole>('medico');
   const [editActive, setEditActive] = useState(true);
   const [editLoading, setEditLoading] = useState(false);
+  const [showImportSummary, setShowImportSummary] = useState(false);
 
   // Delete confirmation state
   const [deleteConfirmHospital, setDeleteConfirmHospital] = useState<string | null>(null);
@@ -53,6 +55,12 @@ export function Configuracion() {
   useEffect(() => {
     loadProfiles();
   }, [loadProfiles]);
+
+  useEffect(() => {
+    if (parseResult || result) {
+      setShowImportSummary(true);
+    }
+  }, [parseResult, result]);
 
   const handleAddUser = async () => {
     if (!addName.trim() || !addEmail.trim() || !addPassword.trim()) return;
@@ -99,6 +107,14 @@ export function Configuracion() {
 
   return (
     <div className="p-4 lg:p-8">
+      {showImportSummary && (parseResult || result) && (
+        <ExcelUploadSummary
+          parseResult={parseResult}
+          uploadResult={result}
+          onClose={() => setShowImportSummary(false)}
+        />
+      )}
+
       {/* Page title */}
       <div className="mb-6 lg:mb-8">
         <h1 className="text-3xl font-bold mb-2" style={{ color: '#0B3C5D' }}>

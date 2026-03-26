@@ -12,10 +12,7 @@ export function useHospitals(): UseHospitalsReturn {
 
   useEffect(() => {
     getDistinctHospitals()
-      .then((result) => {
-        console.log('[useHospitals] fetched:', result);
-        setHospitals(result);
-      })
+      .then((result) => setHospitals(result))
       .catch(() => setHospitals([]))
       .finally(() => setLoading(false));
   }, []);

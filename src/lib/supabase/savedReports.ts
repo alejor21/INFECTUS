@@ -43,7 +43,6 @@ export async function getSavedReports(hospitalId?: string): Promise<SavedReport[
 
   const { data, error } = await query;
   if (error) {
-    console.error('getSavedReports:', error);
     return [];
   }
   return data ?? [];
@@ -60,7 +59,6 @@ export async function saveReport(
     .single();
 
   if (error) {
-    console.error('saveReport:', error);
     return null;
   }
   return data;
@@ -68,6 +66,5 @@ export async function saveReport(
 
 export async function deleteReport(id: string): Promise<void> {
   const supabase = getSupabaseClient();
-  const { error } = await supabase.from('saved_reports').delete().eq('id', id);
-  if (error) console.error('deleteReport:', error);
+  await supabase.from('saved_reports').delete().eq('id', id);
 }

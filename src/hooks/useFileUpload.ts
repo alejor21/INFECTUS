@@ -41,16 +41,6 @@ export function useFileUpload(): UseFileUploadReturn {
       }
 
       const { valid, errors: parseErrors, summary } = parsed;
-
-      // Show summary in console for debugging
-      // eslint-disable-next-line no-console
-      console.info('[Excel Import] Resumen:', {
-        totalFilas: summary.totalRows,
-        filasValidas: summary.validRows,
-        errores: summary.errorRows,
-        columnasFaltantes: summary.missingColumns
-      });
-
       // If nothing is valid, short-circuit
       if (valid.length === 0) {
         const finalResult: UploadResult = {

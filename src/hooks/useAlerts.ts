@@ -11,11 +11,15 @@ import type { Alert } from '../lib/supabase/alerts';
 import type { InterventionRecord } from '../types';
 import type { Hospital } from '../lib/supabase/hospitals';
 
-// Module-level flag ensures auto-generation runs only once per app session
-// regardless of how many hook instances are mounted.
 let autoGenerationDone = false;
 
 const CARBAPENEMS = ['Meropenem', 'Imipenem', 'Ertapenem', 'Doripenem'];
+const pct = (numerator: number, denominator: number): number =>
+  denominator === 0 ? 0 : Math.round((numerator / denominator) * 1000) / 10;
+
+function isYes(value: string | undefined): boolean {
+  return (value ?? '').trim().toUpperCase() === 'SI';
+}
 
 function generateAutoAlerts(
   records: InterventionRecord[],
@@ -25,21 +29,23 @@ function generateAutoAlerts(
   const hospitalsToCheck = selectedHospitalObj ? [selectedHospitalObj] : hospitals;
 
   for (const hospital of hospitalsToCheck) {
-    const hospitalRecords = records.filter((r) => r.hospitalName === hospital.name);
-    if (hospitalRecords.length === 0) continue;
+    const hospitalRecords = records.filter((record) => record.hospitalName === hospital.name);
+    if (hospitalRecords.length === 0) {
+      continue;
+    }
 
-    // Alert 1: Low therapeutic adequacy
-    const adequacy =
-      (hospitalRecords.filter((r) => (r.aproboTerapia ?? '').trim().toUpperCase() === 'SI').length /
-        hospitalRecords.length) *
-      100;
+    const adequacy = pct(
+      hospitalRecords.filter((record) => isYes(record.aproboTerapia)).length,
+      hospitalRecords.length,
+    );
+
     if (adequacy < 60) {
-      saveAlert({
+      void saveAlert({
         hospital_id: hospital.id,
         hospital_name: hospital.name,
         type: 'adecuacion_terapeutica',
         severity: adequacy < 40 ? 'alta' : 'media',
-        title: `Adecuación terapéutica baja — ${hospital.name}`,
+        title: `Adecuación terapéutica baja - ${hospital.name}`,
         message: `La adecuación terapéutica es del ${adequacy.toFixed(1)}%, por debajo del umbral del 60%.`,
         metric_value: adequacy,
         threshold_value: 60,
@@ -47,22 +53,22 @@ function generateAutoAlerts(
       });
     }
 
-    // Alert 2: High carbapenem use (checks both antibiotic slots)
-    const carbapenemCount = hospitalRecords.filter((r) =>
+    const carbapenemCount = hospitalRecords.filter((record) =>
       CARBAPENEMS.some(
-        (c) =>
-          (r.antibiotico01 ?? '').toLowerCase().includes(c.toLowerCase()) ||
-          (r.antibiotico02 ?? '').toLowerCase().includes(c.toLowerCase()),
+        (carbapenem) =>
+          (record.antibiotico01 ?? '').toLowerCase().includes(carbapenem.toLowerCase()) ||
+          (record.antibiotico02 ?? '').toLowerCase().includes(carbapenem.toLowerCase()),
       ),
     ).length;
-    const carbapenemRate = (carbapenemCount / hospitalRecords.length) * 100;
+
+    const carbapenemRate = pct(carbapenemCount, hospitalRecords.length);
     if (carbapenemRate > 20) {
-      saveAlert({
+      void saveAlert({
         hospital_id: hospital.id,
         hospital_name: hospital.name,
         type: 'uso_carbapenems',
         severity: carbapenemRate > 35 ? 'alta' : 'media',
-        title: `Alto uso de carbapenems — ${hospital.name}`,
+        title: `Alto uso de carbapenems - ${hospital.name}`,
         message: `El ${carbapenemRate.toFixed(1)}% de las intervenciones usan carbapenems (umbral: 20%).`,
         metric_value: carbapenemRate,
         threshold_value: 20,
@@ -70,19 +76,19 @@ function generateAutoAlerts(
       });
     }
 
-    // Alert 3: Low culture rate (uses cultivosPrevios field)
-    const withCulture = hospitalRecords.filter((r) => {
-      const c = (r.cultivosPrevios ?? '').trim();
-      return c !== '' && c.toUpperCase() !== 'NO';
+    const withCulture = hospitalRecords.filter((record) => {
+      const cultivosPrevios = (record.cultivosPrevios ?? '').trim().toUpperCase();
+      return cultivosPrevios !== '' && cultivosPrevios !== 'NO';
     }).length;
-    const cultureRate = (withCulture / hospitalRecords.length) * 100;
+
+    const cultureRate = pct(withCulture, hospitalRecords.length);
     if (cultureRate < 30) {
-      saveAlert({
+      void saveAlert({
         hospital_id: hospital.id,
         hospital_name: hospital.name,
         type: 'tasa_cultivos',
         severity: 'baja',
-        title: `Baja tasa de cultivos — ${hospital.name}`,
+        title: `Baja tasa de cultivos - ${hospital.name}`,
         message: `Solo el ${cultureRate.toFixed(1)}% de los pacientes tienen cultivo registrado (umbral: 30%).`,
         metric_value: cultureRate,
         threshold_value: 30,
@@ -91,10 +97,6 @@ function generateAutoAlerts(
     }
   }
 }
-
-// ---------------------------------------------------------------------------
-// Full hook — used by the Alertas page
-// ---------------------------------------------------------------------------
 
 export function useAlerts() {
   const { selectedHospitalObj, allRawRecords, hospitals } = useHospitalContext();
@@ -111,37 +113,42 @@ export function useAlerts() {
     }
   }, [selectedHospitalObj]);
 
-  // Fetch on mount and when selected hospital changes
   useEffect(() => {
-    fetchAlerts();
+    void fetchAlerts();
   }, [fetchAlerts]);
 
-  // Auto-generate alerts once when records first load (module-level guard)
   useEffect(() => {
-    if (autoGenerationDone) return;
-    if (allRawRecords.length === 0 || hospitals.length === 0) return;
+    if (autoGenerationDone || allRawRecords.length === 0 || hospitals.length === 0) {
+      return undefined;
+    }
+
     autoGenerationDone = true;
     generateAutoAlerts(allRawRecords, hospitals, selectedHospitalObj);
-    // Allow inserts to complete before refreshing the list
-    const timer = setTimeout(() => fetchAlerts(), 1200);
-    return () => clearTimeout(timer);
+
+    const timer = window.setTimeout(() => {
+      void fetchAlerts();
+    }, 1200);
+
+    return () => window.clearTimeout(timer);
   }, [allRawRecords, hospitals, selectedHospitalObj, fetchAlerts]);
 
-  const unreadCount = alerts.filter((a) => !a.is_read).length;
+  const unreadCount = alerts.filter((alert) => !alert.is_read).length;
 
   const markRead = useCallback(async (id: string) => {
     await markAlertRead(id);
-    setAlerts((prev) => prev.map((a) => (a.id === id ? { ...a, is_read: true } : a)));
+    setAlerts((previousAlerts) =>
+      previousAlerts.map((alert) => (alert.id === id ? { ...alert, is_read: true } : alert)),
+    );
   }, []);
 
   const markAllRead = useCallback(async () => {
     await markAllAlertsRead(selectedHospitalObj?.id);
-    setAlerts((prev) => prev.map((a) => ({ ...a, is_read: true })));
+    setAlerts((previousAlerts) => previousAlerts.map((alert) => ({ ...alert, is_read: true })));
   }, [selectedHospitalObj]);
 
   const removeAlert = useCallback(async (id: string) => {
     await deleteAlertFromDb(id);
-    setAlerts((prev) => prev.filter((a) => a.id !== id));
+    setAlerts((previousAlerts) => previousAlerts.filter((alert) => alert.id !== id));
   }, []);
 
   return {
@@ -155,18 +162,13 @@ export function useAlerts() {
   };
 }
 
-// ---------------------------------------------------------------------------
-// Lightweight badge hook — used by Sidebar and Header
-// Only fetches the unread count; no auto-generation side effects.
-// ---------------------------------------------------------------------------
-
 export function useAlertBadge(): number {
   const { selectedHospitalObj } = useHospitalContext();
   const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     getAlerts(selectedHospitalObj?.id)
-      .then((data) => setUnreadCount(data.filter((a) => !a.is_read).length))
+      .then((data) => setUnreadCount(data.filter((alert) => !alert.is_read).length))
       .catch(() => setUnreadCount(0));
   }, [selectedHospitalObj]);
 

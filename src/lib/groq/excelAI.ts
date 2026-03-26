@@ -61,7 +61,6 @@ Si un encabezado no corresponde a ningún campo estándar, omítelo.`;
     const cleaned = response.replace(/```json|```/g, '').trim();
     return JSON.parse(cleaned);
   } catch {
-    console.warn('[excelAI] Column mapping parse failed, using exact match fallback');
     return {};
   }
 }
@@ -104,7 +103,6 @@ Incluye TODOS los nombres del array de entrada como keys.`;
     const cleaned = response.replace(/```json|```/g, '').trim();
     return JSON.parse(cleaned);
   } catch {
-    console.warn('[excelAI] Antibiotic normalization parse failed, using original names');
     return {};
   }
 }

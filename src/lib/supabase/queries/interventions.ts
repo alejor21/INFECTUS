@@ -149,8 +149,6 @@ export async function getInterventionsByDateRange(
 
   const { data, error } = await query;
 
-  console.log('[getInterventionsByDateRange] total rows from DB:', data?.length);
-
   if (error || !data) return [];
 
   return (data as DbRow[]).map(fromDbRow);

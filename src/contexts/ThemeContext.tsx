@@ -7,35 +7,62 @@ interface ThemeContextType {
   toggleTheme: () => void;
 }
 
+const STORAGE_KEY = 'infectus-theme';
+
 const ThemeContext = createContext<ThemeContextType>({
   theme: 'light',
   toggleTheme: () => {},
 });
 
+function getPreferredTheme(): Theme {
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<Theme>(() => {
     try {
-      return (localStorage.getItem('infectus-theme') as Theme) ?? 'light';
+      const storedTheme = localStorage.getItem(STORAGE_KEY);
+      if (storedTheme === 'light' || storedTheme === 'dark') {
+        return storedTheme;
+      }
     } catch {
-      return 'light';
+      return getPreferredTheme();
     }
+
+    return getPreferredTheme();
   });
 
   useEffect(() => {
     const root = document.documentElement;
-    if (theme === 'dark') {
-      root.classList.add('dark');
-    } else {
-      root.classList.remove('dark');
-    }
+    root.classList.toggle('dark', theme === 'dark');
+
     try {
-      localStorage.setItem('infectus-theme', theme);
+      localStorage.setItem(STORAGE_KEY, theme);
     } catch {
-      // Ignore storage errors
+      // Ignore storage errors.
     }
   }, [theme]);
 
-  const toggleTheme = () => setTheme((t) => (t === 'light' ? 'dark' : 'light'));
+  useEffect(() => {
+    try {
+      const storedTheme = localStorage.getItem(STORAGE_KEY);
+      if (storedTheme === 'light' || storedTheme === 'dark') {
+        return undefined;
+      }
+    } catch {
+      return undefined;
+    }
+
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = (event: MediaQueryListEvent) => {
+      setTheme(event.matches ? 'dark' : 'light');
+    };
+
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, []);
+
+  const toggleTheme = () => setTheme((currentTheme) => (currentTheme === 'light' ? 'dark' : 'light'));
 
   return (
     <ThemeContext.Provider value={{ theme, toggleTheme }}>

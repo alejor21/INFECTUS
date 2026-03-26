@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Package } from 'lucide-react';
+import { toast } from 'sonner';
 import {
   ConfirmDialog,
   EmptyState,
@@ -133,7 +134,7 @@ export function ComponentShowcase() {
               { key: 'days', label: 'Días' },
             ]}
             data={tableData}
-            onRowClick={(row) => console.log('Row clicked:', row)}
+            onRowClick={(row) => toast.info(`Fila seleccionada: ${String(row.patient)}`)}
           />
         </section>
 
@@ -156,7 +157,7 @@ export function ComponentShowcase() {
             confirmLabel="Eliminar"
             isDangerous={true}
             onConfirm={() => {
-              alert('✅ Acción confirmada!');
+              toast.success('Acción confirmada');
               setShowConfirm(false);
             }}
             onCancel={() => setShowConfirm(false)}

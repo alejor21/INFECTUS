@@ -175,7 +175,7 @@ export function CalculadoraDDD() {
   const manCalcResult = useMemo(() => {
     const g = parseFloat(manGrams);
     const d = parseFloat(manDDDInput);
-    if (isNaN(g) || isNaN(d) || d === 0) return null;
+    if (isNaN(g) || isNaN(d) || d === 0 || bedsNum === 0 || daysNum === 0) return null;
     return (g / d) / (bedsNum * daysNum) * 100;
   }, [manGrams, manDDDInput, bedsNum, daysNum]);
 
