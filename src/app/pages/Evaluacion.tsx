@@ -21,6 +21,7 @@ import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import type { Hospital } from '../../lib/supabase/hospitals';
 import { useAuth } from '../../contexts/AuthContext';
+import { InfoTooltip } from '../components/Tooltip';
 import type { ComplianceValue, ProaSectionId } from '../../modules/evaluacion/data/proaItems';
 import {
   PROA_SECTIONS,
@@ -498,14 +499,14 @@ export function Evaluacion() {
           <div className="flex flex-col items-center gap-4 text-center p-8 bg-white rounded-2xl border border-gray-200 shadow-sm max-w-sm w-full">
             <Building2 className="w-16 h-16 text-gray-200" />
             <div>
-              <p className="text-base font-semibold text-gray-700">No hay hospitales registrados</p>
-              <p className="text-sm text-gray-400 mt-1">Agrega tu primer hospital para comenzar</p>
+              <p className="text-base font-semibold text-gray-700">Aún no has creado ningún hospital</p>
+              <p className="text-sm text-gray-400 mt-1">Crea el primero para comenzar a registrar intervenciones PROA.</p>
             </div>
             <button
               onClick={() => navigate('/hospitales')}
               className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg px-5 min-h-[44px] transition-colors"
             >
-              Agregar Hospital
+              Crear mi primer hospital
             </button>
           </div>
         </div>
@@ -723,7 +724,10 @@ function ListContent({
       {/* Page Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl font-bold text-gray-800">Evaluaciones PROA</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-bold text-gray-800">Evaluaciones PROA</h1>
+            <InfoTooltip content="Registro individual de cada intervención del equipo PROA" />
+          </div>
           {selectedHospital && (
             <p className="text-sm text-gray-500 mt-0.5">{selectedHospital.name}</p>
           )}
@@ -785,8 +789,17 @@ function ListContent({
       {!selectedHospital ? (
         <EmptyState
           icon={<ClipboardCheck className="w-20 h-20 text-gray-300" />}
-          title="Selecciona un hospital"
-          subtitle="Elige un hospital para ver sus evaluaciones PROA"
+          title="Primero selecciona o crea un hospital para comenzar"
+          subtitle="Necesitas un hospital activo para ver y registrar evaluaciones PROA."
+          action={
+            <button
+              onClick={() => navigate('/hospitales')}
+              className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg px-4 min-h-[44px] transition-colors"
+            >
+              <Building2 className="w-4 h-4" />
+              Crear hospital
+            </button>
+          }
         />
       ) : isLoading ? (
         <div className="flex items-center justify-center py-24">
@@ -823,16 +836,25 @@ function ListContent({
           {evaluations.length === 0 && borradores.length === 0 ? (
             <EmptyState
               icon={<ClipboardCheck className="w-20 h-20 text-gray-300" />}
-              title="Sin evaluaciones"
-              subtitle="No hay evaluaciones registradas para este hospital"
+              title="Aún no tienes evaluaciones"
+              subtitle="Sube un archivo Excel o crea una evaluación manual para comenzar con este hospital."
               action={
-                <button
-                  onClick={onNewEvaluation}
-                  className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg px-4 min-h-[44px] transition-colors"
-                >
-                  <Plus className="w-4 h-4" />
-                  Nueva Evaluación
-                </button>
+                <div className="flex flex-col gap-3 sm:flex-row">
+                  <button
+                    onClick={() => navigate('/hospitales')}
+                    className="flex items-center justify-center gap-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-medium rounded-lg px-4 min-h-[44px] transition-colors"
+                  >
+                    <Building2 className="w-4 h-4" />
+                    Subir Excel
+                  </button>
+                  <button
+                    onClick={onNewEvaluation}
+                    className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg px-4 min-h-[44px] transition-colors"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Crear evaluación manual
+                  </button>
+                </div>
               }
             />
           ) : evaluations.length > 0 ? (

@@ -18,6 +18,8 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useHospitalContext } from '../../contexts/HospitalContext';
+import { EmptyState } from '../components/EmptyState';
+import { InfoTooltip } from '../components/Tooltip';
 import { WelcomeModal, shouldShowWelcome } from '../components/WelcomeModal';
 import { useDashboardStats } from '../../hooks/useDashboardStats';
 
@@ -144,9 +146,12 @@ export function Dashboard() {
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-            {getGreeting(firstName)}
-          </h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+              {getGreeting(firstName)}
+            </h1>
+            <InfoTooltip content="Resumen general de las evaluaciones del mes actual" />
+          </div>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
             {selectedHospitalObj
               ? `${selectedHospitalObj.name} · aquí está el resumen de hoy`
@@ -166,11 +171,13 @@ export function Dashboard() {
       </div>
 
       {!hasHospital && (
-        <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-700 dark:bg-amber-900/20">
-          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
-          <p className="text-sm text-amber-700 dark:text-amber-400">
-            <span className="font-semibold">Primero selecciona un hospital</span> desde el menú lateral para ver tus métricas y actividad.
-          </p>
+        <div className="rounded-2xl border border-dashed border-gray-300 bg-white dark:border-gray-700 dark:bg-gray-900">
+          <EmptyState
+            icon={Building2}
+            title="Primero selecciona o crea un hospital para comenzar"
+            description="Necesitas un hospital activo para ver el resumen del dashboard y las métricas del programa."
+            action={{ label: 'Crear hospital', onClick: () => navigate('/hospitales') }}
+          />
         </div>
       )}
 
@@ -256,56 +263,27 @@ export function Dashboard() {
       </div>
 
       {hasNoData && (
-        <div>
-          <h2 className="mb-1 text-xl font-semibold text-gray-900 dark:text-white">Empieza en 3 pasos</h2>
-          <p className="mb-5 text-sm text-gray-500 dark:text-gray-400">Sigue esta guía para configurar tu programa PROA.</p>
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-            <div className="relative rounded-2xl border border-gray-200 bg-white p-5 pt-7 dark:border-gray-800 dark:bg-gray-900">
-              <span className="absolute -top-3 left-5 flex h-7 w-7 items-center justify-center rounded-full bg-teal-600 text-xs font-bold text-white shadow-sm">
-                1
-              </span>
-              <Building2 className="mb-3 h-10 w-10 text-teal-500" />
-              <h3 className="mb-1 font-semibold text-gray-900 dark:text-white">Configura tu hospital</h3>
-              <p className="mb-4 text-sm leading-relaxed text-gray-500 dark:text-gray-400">
-                Asegúrate de tener completa la información principal del hospital antes de empezar a registrar datos.
-              </p>
-              <div className="flex items-center gap-1.5 text-sm font-medium text-emerald-600 dark:text-emerald-400">
-                <CheckCircle2 className="h-4 w-4" />
-                Completado
-              </div>
+        <div className="rounded-2xl border border-dashed border-gray-300 bg-white dark:border-gray-700 dark:bg-gray-900">
+          <div className="px-6 py-12 text-center">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800">
+              <ClipboardCheck className="h-8 w-8 text-gray-400 dark:text-gray-500" />
             </div>
-
-            <div className="relative rounded-2xl border border-gray-200 bg-white p-5 pt-7 dark:border-gray-800 dark:bg-gray-900">
-              <span className="absolute -top-3 left-5 flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-xs font-bold text-white shadow-sm">
-                2
-              </span>
-              <FileSpreadsheet className="mb-3 h-10 w-10 text-emerald-500" />
-              <h3 className="mb-1 font-semibold text-gray-900 dark:text-white">Carga tus datos históricos</h3>
-              <p className="mb-4 text-sm leading-relaxed text-gray-500 dark:text-gray-400">
-                Sube un archivo Excel con las intervenciones PROA para generar analíticas y seguimiento por periodo.
-              </p>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Aún no tienes evaluaciones</h2>
+            <p className="mx-auto mt-2 max-w-xl text-sm text-gray-500 dark:text-gray-400">
+              Sube un archivo Excel o crea una evaluación manual para empezar a ver el resumen del hospital.
+            </p>
+            <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
               <button
                 onClick={() => navigate('/hospitales')}
-                className="text-sm font-medium text-teal-600 transition-colors hover:text-teal-700 dark:text-teal-400 dark:hover:text-teal-300"
+                className="inline-flex min-h-[44px] items-center justify-center rounded-xl bg-teal-600 px-4 py-2.5 text-sm font-medium text-white transition-all duration-200 hover:bg-teal-700"
               >
-                Subir Excel →
+                Subir Excel
               </button>
-            </div>
-
-            <div className="relative rounded-2xl border border-gray-200 bg-white p-5 pt-7 dark:border-gray-800 dark:bg-gray-900">
-              <span className="absolute -top-3 left-5 flex h-7 w-7 items-center justify-center rounded-full bg-violet-600 text-xs font-bold text-white shadow-sm">
-                3
-              </span>
-              <ClipboardCheck className="mb-3 h-10 w-10 text-violet-500" />
-              <h3 className="mb-1 font-semibold text-gray-900 dark:text-white">Realiza tu primera evaluación</h3>
-              <p className="mb-4 text-sm leading-relaxed text-gray-500 dark:text-gray-400">
-                Registra tu evaluación PROA y continúa el seguimiento desde el listado de evaluaciones.
-              </p>
               <button
                 onClick={() => navigate('/evaluacion')}
-                className="text-sm font-medium text-teal-600 transition-colors hover:text-teal-700 dark:text-teal-400 dark:hover:text-teal-300"
+                className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 transition-all duration-200 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800"
               >
-                Nueva evaluación →
+                Crear evaluación manual
               </button>
             </div>
           </div>

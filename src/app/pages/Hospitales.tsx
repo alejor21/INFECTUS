@@ -28,6 +28,8 @@ import { toast } from 'sonner';
 import { processAndSaveExcel } from '../../modules/excel/excelProcessor';
 import { useHospitalFiles } from '../../hooks/useHospitalFiles';
 import { useHospitalUploadStatuses } from '../../hooks/useHospitalUploadStatuses';
+import { EmptyState } from '../components/EmptyState';
+import { InfoTooltip } from '../components/Tooltip';
 
 const MONTH_NAMES = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -468,9 +470,12 @@ export function Hospitales() {
         {/* Header */}
         <div className="flex flex-wrap items-center justify-between gap-3 mb-6 lg:mb-8">
           <div>
-            <h1 className="mb-1 text-3xl font-bold text-slate-900 dark:text-white">
-              Gestión de Hospitales
-            </h1>
+            <div className="mb-1 flex items-center gap-2">
+              <h1 className="text-3xl font-bold text-slate-900 dark:text-white">
+                Gestión de Hospitales
+              </h1>
+              <InfoTooltip content="Gestiona los hospitales donde aplicas el Programa PROA" />
+            </div>
             <p className="text-gray-500 text-sm">
               Administre los hospitales registrados y sus archivos de datos
             </p>
@@ -592,14 +597,13 @@ export function Hospitales() {
 
         {/* Hospital cards grid */}
         {hospitals.length === 0 ? (
-          <div className="text-center py-20">
-            <Building2 className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-            <p className="text-gray-500 font-medium">No hay hospitales registrados</p>
-            {canCreate && (
-              <p className="text-gray-400 text-sm mt-1">
-                Haz clic en "+ Nuevo Hospital" para agregar el primero.
-              </p>
-            )}
+          <div className="rounded-2xl border border-dashed border-gray-300 bg-white dark:border-gray-700 dark:bg-gray-900">
+            <EmptyState
+              icon={Building2}
+              title="Aún no has creado ningún hospital"
+              description="Crea tu primer hospital para empezar a cargar archivos y registrar evaluaciones PROA."
+              action={canCreate ? { label: 'Crear mi primer hospital', onClick: () => setShowAddForm(true) } : undefined}
+            />
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

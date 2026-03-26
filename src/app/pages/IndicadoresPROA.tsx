@@ -1,4 +1,5 @@
-import { Target, TrendingUp, AlertCircle, CheckCircle2, Award, BarChart3 } from 'lucide-react';
+import { Target, TrendingUp, AlertCircle, CheckCircle2, Award, BarChart3, Building2, FileSpreadsheet } from 'lucide-react';
+import { useNavigate } from 'react-router';
 import { IndicatorCard } from '../components/IndicatorCard';
 import { ComplianceChart } from '../components/ComplianceChart';
 import { QualityMetricsChart } from '../components/QualityMetricsChart';
@@ -6,6 +7,8 @@ import { ObjectivesProgressChart } from '../components/ObjectivesProgressChart';
 import { IndicatorsTable } from '../components/IndicatorsTable';
 import type { ProaIndicatorRow } from '../components/IndicatorsTable';
 import { BenchmarkComparisonChart } from '../components/BenchmarkComparisonChart';
+import { EmptyState } from '../components/EmptyState';
+import { InfoTooltip } from '../components/Tooltip';
 import { useAnalytics } from '../../hooks/useAnalytics';
 import { useHospitalContext } from '../components/Layout';
 import type { InterventionRecord } from '../../types';
@@ -52,11 +55,14 @@ const DATE_RANGE_LABEL: Record<'1m' | '6m' | '12m' | 'all', string> = {
 };
 
 export function IndicadoresPROA() {
+  const navigate = useNavigate();
   const { selectedHospitalObj, hospitals, dateRange } = useHospitalContext();
   const { kpis, monthlyCompliance, records, loading, cultivosPreRate, avgTherapyDays } = useAnalytics();
 
   const totalRecords = records.length;
   const actualizacion = latestDateLabel(records);
+  const noHospitalSelected = !selectedHospitalObj;
+  const noAnalyticsData = selectedHospitalObj && !loading && totalRecords === 0;
 
   const proa003 = pct(
     records.filter((record) => (record.tipoIntervencion ?? '').trim().toUpperCase() === 'IC').length,
@@ -144,10 +150,51 @@ export function IndicadoresPROA() {
     },
   ];
 
+  if (noHospitalSelected) {
+    return (
+      <div className="p-8">
+        <div className="mb-8 flex items-center gap-2">
+          <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Indicadores PROA</h1>
+          <InfoTooltip content="Reportes automáticos basados en tus evaluaciones PROA" />
+        </div>
+        <div className="rounded-2xl border border-dashed border-gray-300 bg-white dark:border-gray-700 dark:bg-gray-900">
+          <EmptyState
+            icon={Building2}
+            title="Primero selecciona o crea un hospital para comenzar"
+            description="Selecciona un hospital activo para consultar las analíticas del programa PROA."
+            action={{ label: 'Crear hospital', onClick: () => navigate('/hospitales') }}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  if (noAnalyticsData) {
+    return (
+      <div className="p-8">
+        <div className="mb-8 flex items-center gap-2">
+          <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Indicadores PROA</h1>
+          <InfoTooltip content="Reportes automáticos basados en tus evaluaciones PROA" />
+        </div>
+        <div className="rounded-2xl border border-dashed border-gray-300 bg-white dark:border-gray-700 dark:bg-gray-900">
+          <EmptyState
+            icon={FileSpreadsheet}
+            title="Sin datos para el período seleccionado"
+            description="Sube un archivo Excel o registra evaluaciones para ver las analíticas de este hospital."
+            action={{ label: 'Subir Excel', onClick: () => navigate('/hospitales') }}
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={loading ? 'p-8 opacity-50' : 'p-8'}>
       <div className="mb-8">
-        <h1 className="mb-1 text-3xl font-bold text-slate-900 dark:text-white">Indicadores PROA</h1>
+        <div className="mb-1 flex items-center gap-2">
+          <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Indicadores PROA</h1>
+          <InfoTooltip content="Reportes automáticos basados en tus evaluaciones PROA" />
+        </div>
         {selectedHospitalObj ? (
           <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
             {selectedHospitalObj.name} · {selectedHospitalObj.city}, {selectedHospitalObj.department}

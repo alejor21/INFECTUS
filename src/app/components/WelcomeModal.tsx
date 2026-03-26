@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { Heart, Building2, FileSpreadsheet, BarChart3, ClipboardCheck, ChevronRight, ChevronLeft, X } from 'lucide-react';
+import { Building2, CheckCircle2, ClipboardCheck, FileSpreadsheet, BarChart3, X } from 'lucide-react';
 
 interface WelcomeModalProps {
   userId: string;
@@ -8,30 +7,26 @@ interface WelcomeModalProps {
 
 const STORAGE_KEY = (id: string) => `infectus_welcomed_${id}`;
 
-const STEPS = [
+const steps = [
   {
     icon: Building2,
-    title: 'Crea tu Hospital',
-    description: 'Comienza creando o seleccionando tu hospital. Ve a "Hospitales" y haz clic en "Nuevo Hospital".',
-    tip: '💡 Puedes agregar múltiples hospitales si gestionas varios centros.',
+    title: 'Crea tu hospital',
+    description: 'Configura la institución donde aplicarás el seguimiento PROA.',
   },
   {
     icon: FileSpreadsheet,
-    title: 'Sube tu Excel PROA',
-    description: 'Importa tus datos históricos subiendo el archivo Excel del programa PROA. El sistema procesará automáticamente todas las columnas.',
-    tip: '📋 Acepta formatos .xlsx, .xls y .csv con las columnas estándar PROA.',
+    title: 'Sube tu Excel PROA del mes',
+    description: 'Importa tus intervenciones y deja que INFECTUS procese los datos automáticamente.',
   },
   {
     icon: BarChart3,
-    title: 'Ve tus Analíticas',
-    description: 'Visualiza indicadores clave: % aprobación, cultivos previos, terapia empírica, antibióticos más usados, y más.',
-    tip: '📊 Las gráficas se actualizan automáticamente con cada importación.',
+    title: 'Revisa tus analíticas automáticas',
+    description: 'Consulta indicadores, tendencias y comportamiento de los servicios.',
   },
   {
     icon: ClipboardCheck,
-    title: 'Registra Manualmente',
-    description: 'También puedes registrar evaluaciones PROA manualmente, una por una, usando el formulario de evaluación.',
-    tip: '✏️ El sistema guarda borradores automáticamente mientras trabajas.',
+    title: 'Registra evaluaciones manualmente',
+    description: 'Completa intervenciones individuales cuando necesites seguimiento caso a caso.',
   },
 ];
 
@@ -41,137 +36,91 @@ function dismiss(userId: string, onDismiss: () => void) {
 }
 
 export function WelcomeModal({ userId, onDismiss }: WelcomeModalProps) {
-  const [currentStep, setCurrentStep] = useState(0);
   const handleDismiss = () => dismiss(userId, onDismiss);
-
-  const step = STEPS[currentStep];
-  const Icon = step.icon;
-  const isLastStep = currentStep === STEPS.length - 1;
-  const isFirstStep = currentStep === 0;
 
   return (
     <div
-      className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
       aria-labelledby="welcome-title"
+      onClick={handleDismiss}
     >
       <div
-        className="bg-white dark:bg-gray-800 rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300"
-        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-2xl rounded-3xl bg-white p-6 shadow-2xl animate-in fade-in zoom-in duration-200 dark:bg-gray-900 sm:p-8"
+        onClick={(event) => event.stopPropagation()}
       >
-        {/* Header */}
-        <div className="bg-gradient-to-r from-teal-600 to-teal-700 px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
-              <Heart className="w-5 h-5 text-white" />
+        <div className="mb-6 flex items-start justify-between gap-4">
+          <div className="flex items-start gap-4">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-teal-100 text-teal-600 dark:bg-teal-900/30 dark:text-teal-300">
+              <CheckCircle2 className="h-7 w-7" />
             </div>
             <div>
-              <h2 id="welcome-title" className="text-lg font-bold text-white">
-                ¡Bienvenido a Infectus!
+              <h2 id="welcome-title" className="text-2xl font-bold text-gray-900 dark:text-white">
+                ¡Bienvenido a INFECTUS!
               </h2>
-              <p className="text-teal-100 text-sm">Guía rápida de inicio</p>
+              <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                Sigue estos 4 pasos para comenzar:
+              </p>
             </div>
           </div>
           <button
+            type="button"
             onClick={handleDismiss}
-            className="p-2 rounded-lg hover:bg-white/20 transition-colors"
-            aria-label="Cerrar"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-xl text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+            aria-label="Cerrar bienvenida"
           >
-            <X className="w-5 h-5 text-white" />
+            <X className="h-5 w-5" />
           </button>
         </div>
 
-        {/* Progress */}
-        <div className="px-6 pt-4">
-          <div className="flex items-center justify-between mb-2">
-            {STEPS.map((_, index) => (
-              <div
-                key={index}
-                className={`flex-1 h-1.5 rounded-full mx-0.5 transition-colors ${
-                  index <= currentStep
-                    ? 'bg-teal-600 dark:bg-teal-500'
-                    : 'bg-gray-200 dark:bg-gray-700'
-                }`}
-              />
-            ))}
-          </div>
-          <p className="text-xs text-gray-500 dark:text-gray-400 text-right">
-            Paso {currentStep + 1} de {STEPS.length}
-          </p>
+        <div className="grid gap-4 md:grid-cols-2">
+          {steps.map((step, index) => (
+            <div
+              key={step.title}
+              className="rounded-2xl border border-gray-200 bg-gray-50 p-5 dark:border-gray-800 dark:bg-gray-950/50"
+            >
+              <div className="mb-4 flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-teal-600 shadow-sm dark:bg-gray-900 dark:text-teal-300">
+                  <step.icon className="h-5 w-5" />
+                </div>
+                <span className="text-sm font-semibold text-teal-600 dark:text-teal-300">
+                  Paso {index + 1}
+                </span>
+              </div>
+              <h3 className="text-base font-semibold text-gray-900 dark:text-white">{step.title}</h3>
+              <p className="mt-2 text-sm leading-relaxed text-gray-500 dark:text-gray-400">
+                {step.description}
+              </p>
+            </div>
+          ))}
         </div>
 
-        {/* Content */}
-        <div className="p-6">
-          <div className="flex items-center gap-4 mb-4">
-            <div className="w-14 h-14 bg-teal-100 dark:bg-teal-900/30 rounded-xl flex items-center justify-center flex-shrink-0">
-              <Icon className="w-7 h-7 text-teal-600 dark:text-teal-400" />
-            </div>
-            <div>
-              <h3 className="text-xl font-bold text-gray-900 dark:text-white">
-                {step.title}
-              </h3>
-            </div>
-          </div>
-
-          <p className="text-gray-600 dark:text-gray-300 mb-4 leading-relaxed">
-            {step.description}
-          </p>
-
-          <div className="bg-teal-50 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-lg p-3">
-            <p className="text-sm text-teal-700 dark:text-teal-300">
-              {step.tip}
-            </p>
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className="px-6 py-4 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between">
-          {!isFirstStep ? (
-            <button
-              onClick={() => setCurrentStep(currentStep - 1)}
-              className="flex items-center gap-2 px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
-            >
-              <ChevronLeft className="w-4 h-4" />
-              Anterior
-            </button>
-          ) : (
-            <button
-              onClick={handleDismiss}
-              className="text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-            >
-              Saltar guía
-            </button>
-          )}
-
-          {isLastStep ? (
-            <button
-              onClick={handleDismiss}
-              className="flex items-center gap-2 px-6 py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-semibold rounded-lg transition-colors"
-            >
-              ¡Empezar ahora! 🚀
-            </button>
-          ) : (
-            <button
-              onClick={() => setCurrentStep(currentStep + 1)}
-              className="flex items-center gap-2 px-6 py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-semibold rounded-lg transition-colors"
-            >
-              Siguiente
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          )}
+        <div className="mt-8 space-y-3">
+          <button
+            type="button"
+            onClick={handleDismiss}
+            className="inline-flex min-h-[44px] w-full items-center justify-center rounded-xl bg-teal-600 px-4 py-3 text-sm font-semibold text-white transition-all duration-200 hover:bg-teal-700"
+          >
+            ¡Empezar ahora!
+          </button>
+          <button
+            type="button"
+            onClick={handleDismiss}
+            className="block w-full text-center text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+          >
+            Saltar por ahora
+          </button>
         </div>
       </div>
     </div>
   );
 }
 
-/** Returns true if the welcome modal should be shown for this user. */
 export function shouldShowWelcome(userId: string): boolean {
   return !localStorage.getItem(STORAGE_KEY(userId));
 }
 
-/** Resets the welcome modal so it shows again for the user. */
 export function resetWelcome(userId: string): void {
   localStorage.removeItem(STORAGE_KEY(userId));
 }
