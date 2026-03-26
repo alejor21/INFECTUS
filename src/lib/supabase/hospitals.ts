@@ -56,6 +56,43 @@ export interface HospitalUploadStatus {
   uploaded_at: string;
 }
 
+interface HospitalExcelUploadRow {
+  hospital_id: string;
+  periodo: string | null;
+  mes: number | null;
+  anio: number | null;
+  total_filas: number | null;
+  created_at: string;
+}
+
+function formatUploadPeriod(periodo: string | null, mes: number | null, anio: number | null): string | null {
+  if (periodo) {
+    return periodo;
+  }
+
+  if (mes === null || anio === null) {
+    return null;
+  }
+
+  const monthNames = [
+    'Enero',
+    'Febrero',
+    'Marzo',
+    'Abril',
+    'Mayo',
+    'Junio',
+    'Julio',
+    'Agosto',
+    'Septiembre',
+    'Octubre',
+    'Noviembre',
+    'Diciembre',
+  ];
+
+  const monthLabel = monthNames[mes - 1];
+  return monthLabel ? `${monthLabel} ${anio}` : String(anio);
+}
+
 export const getHospitals = async (): Promise<Hospital[]> => {
   const { data } = await getSupabaseClient().from('hospitals').select('*').order('name');
   return data ?? [];
@@ -139,22 +176,27 @@ export const getHospitalUploadStatuses = async (
 
   const { data, error } = await getSupabaseClient()
     .from('hospital_excel_uploads')
-    .select('hospital_id, months_found, total_rows, uploaded_at')
+    .select('hospital_id, periodo, mes, anio, total_filas, created_at')
     .in('hospital_id', hospitalIds);
 
   if (error) throw error;
 
-  return ((data ?? []) as Array<HospitalUploadStatus & { hospital_id: string }>).reduce<Record<string, HospitalUploadStatus>>(
-    (accumulator, item) => {
-      accumulator[item.hospital_id] = {
-        months_found: item.months_found,
-        total_rows: item.total_rows,
-        uploaded_at: item.uploaded_at,
-      };
-      return accumulator;
-    },
-    {},
-  );
+  return ((data ?? []) as HospitalExcelUploadRow[]).reduce<Record<string, HospitalUploadStatus>>((accumulator, item) => {
+    const current = accumulator[item.hospital_id];
+    const nextPeriod = formatUploadPeriod(item.periodo, item.mes, item.anio);
+    const previousPeriods = current?.months_found ?? [];
+    const months_found = nextPeriod && !previousPeriods.includes(nextPeriod)
+      ? [...previousPeriods, nextPeriod]
+      : previousPeriods;
+
+    accumulator[item.hospital_id] = {
+      months_found,
+      total_rows: (current?.total_rows ?? 0) + (item.total_filas ?? 0),
+      uploaded_at: current && current.uploaded_at > item.created_at ? current.uploaded_at : item.created_at,
+    };
+
+    return accumulator;
+  }, {});
 };
 
 export const deleteHospitalFileData = async (

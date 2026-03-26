@@ -223,15 +223,17 @@ export function HospitalDashboard() {
         .order('month', { ascending: true }),
       supabase
         .from('hospital_excel_uploads')
-        .select('id,hospital_id,file_name,file_size,uploaded_at,processed,total_rows,months_found,ai_summary')
+        .select('id,hospital_id,user_id,filename,periodo,mes,anio,total_filas,filas_validas,filas_error,estado,errores,created_at,updated_at')
         .eq('hospital_id', hospitalId)
-        .maybeSingle(),
+        .order('created_at', { ascending: false })
+        .limit(1),
     ]);
 
     setHospital(hosp as HospitalInfo | null);
     const metricRows = (monthData ?? []) as HospitalMonthlyMetric[];
     setMonths(metricRows);
-    setUpload(uploadData as HospitalExcelUpload | null);
+    const latestUpload = ((uploadData ?? []) as HospitalExcelUpload[])[0] ?? null;
+    setUpload(latestUpload);
 
     if (!initialMonthSet.current && metricRows.length > 0) {
       initialMonthSet.current = true;
@@ -377,7 +379,7 @@ Responde en español, tono profesional médico.`;
             {upload && (
               <span className="text-xs text-gray-400 dark:text-gray-500 flex items-center gap-1">
                 <Calendar className="w-3 h-3" />
-                Actualizado {new Date(upload.uploaded_at).toLocaleDateString('es-CO')}
+                Actualizado {new Date(upload.created_at).toLocaleDateString('es-CO')}
               </span>
             )}
           </div>

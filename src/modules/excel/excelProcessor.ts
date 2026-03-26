@@ -60,13 +60,18 @@ export interface HospitalMonthlyMetric {
 export interface HospitalExcelUpload {
   id: string;
   hospital_id: string;
-  file_name: string;
-  file_size: number | null;
-  uploaded_at: string;
-  processed: boolean;
-  total_rows: number;
-  months_found: string[];
-  ai_summary: string | null;
+  user_id: string;
+  filename: string;
+  periodo: string | null;
+  mes: number | null;
+  anio: number | null;
+  total_filas: number;
+  filas_validas: number;
+  filas_error: number;
+  estado: 'procesando' | 'completado' | 'error';
+  errores: unknown[];
+  created_at: string;
+  updated_at: string;
 }
 
 export interface ProcessResult {
@@ -74,6 +79,10 @@ export interface ProcessResult {
   monthsFound: string[];
   totalRows: number;
   error?: string;
+}
+
+interface InsertedUploadRow {
+  id: string;
 }
 
 // ─── Private helpers ───────────────────────────────────────────────────────
@@ -324,37 +333,34 @@ export async function processAndSaveExcel(
     // ── Persist to Supabase ───────────────────────────────────────────────
     const supabase = getSupabaseClient();
 
+    const latestMonth = monthlyData[monthlyData.length - 1] ?? null;
+    const latestMonthParts = latestMonth?.month.split('-') ?? [];
+    const latestYear = latestMonthParts.length === 2 ? Number(latestMonthParts[0]) : null;
+    const latestMonthNumber = latestMonthParts.length === 2 ? Number(latestMonthParts[1]) : null;
+
+    let uploadId: string | null = null;
+
     const { data: upload, error: uploadError } = await supabase
       .from('hospital_excel_uploads')
-      .upsert(
-        {
-          hospital_id: hospitalId,
-          file_name: file.name,
-          file_size: file.size,
-          uploaded_by: uploadedBy,
-          processed: true,
-          total_rows: totalRows,
-          months_found: monthsFound,
-          raw_data: {
-            fileName: file.name,
-            sheetsCount: workbook.SheetNames.length,
-            strategy,
-            monthsDetected: monthsFound.length,
-          },
-        },
-        { onConflict: 'hospital_id' },
-      )
+      .insert({
+        hospital_id: hospitalId,
+        user_id: uploadedBy,
+        filename: file.name,
+        periodo: latestMonth?.monthLabel ?? null,
+        mes: latestMonthNumber,
+        anio: latestYear,
+        total_filas: totalRows,
+        filas_validas: totalRows,
+        filas_error: 0,
+        estado: 'completado',
+        errores: [],
+      })
       .select('id')
       .single();
 
-    if (uploadError) {
-      return { success: false, monthsFound: [], totalRows: 0, error: uploadError.message };
+    if (!uploadError && upload) {
+      uploadId = (upload as InsertedUploadRow).id;
     }
-    if (!upload) {
-      return { success: false, monthsFound: [], totalRows: 0, error: 'Error al guardar el registro de carga' };
-    }
-
-    const uploadId = (upload as Record<string, unknown>).id as string;
 
     for (const { month, monthLabel, metrics, rowCount } of monthlyData) {
       await supabase
