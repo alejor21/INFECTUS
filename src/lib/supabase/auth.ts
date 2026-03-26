@@ -1,47 +1,78 @@
 import { getSupabaseClient } from './client';
 
+type ProfileRole = 'administrador' | 'infectologo' | 'medico' | 'visor';
+
 export const signIn = (email: string, password: string) =>
-  getSupabaseClient().auth.signInWithPassword({ email, password });
+  getSupabaseClient().auth.signInWithPassword({
+    email: email.trim().toLowerCase(),
+    password,
+  });
 
-export const signUp = async (email: string, password: string, fullName: string, role: string) => {
-  const supabase = getSupabaseClient()
-  const { data, error } = await supabase.auth.signUp({ email, password })
+export const signUp = async (
+  email: string,
+  password: string,
+  fullName: string,
+  role: ProfileRole,
+) => {
+  const supabase = getSupabaseClient();
+  const normalizedEmail = email.trim().toLowerCase();
+  const normalizedName = fullName.trim();
 
-  if (error) throw error
-  if (!data.user) throw new Error('No se pudo crear el usuario')
+  const { data, error } = await supabase.auth.signUp({
+    email: normalizedEmail,
+    password,
+    options: {
+      data: {
+        full_name: normalizedName,
+        role,
+      },
+    },
+  });
 
-  const initials = fullName.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()
+  if (error) throw error;
+  if (!data.user) throw new Error('No se pudo crear el usuario.');
 
-  const { error: profileError } = await supabase.from('profiles').insert({
-    id: data.user.id,
-    full_name: fullName,
-    email: email,
-    role: role,
-    avatar_initials: initials,
-    is_active: true
-  })
+  const initials = normalizedName
+    .split(/\s+/)
+    .map((namePart) => namePart[0] ?? '')
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
 
-  if (profileError) throw new Error('Error creando perfil: ' + profileError.message)
+  const { error: profileError } = await supabase.from('profiles').upsert(
+    {
+      id: data.user.id,
+      full_name: normalizedName,
+      email: normalizedEmail,
+      role,
+      avatar_initials: initials,
+      is_active: true,
+    },
+    { onConflict: 'id' },
+  );
 
-  return data
-}
+  if (profileError) {
+    throw new Error(`Error creando perfil: ${profileError.message}`);
+  }
+
+  return data;
+};
+
+export const sendPasswordReset = (email: string, redirectTo: string) =>
+  getSupabaseClient().auth.resetPasswordForEmail(email.trim().toLowerCase(), { redirectTo });
+
+export const updatePassword = (password: string) =>
+  getSupabaseClient().auth.updateUser({ password });
 
 export const signOut = () => getSupabaseClient().auth.signOut();
 
 export const getProfile = async (userId: string) => {
-  const { data } = await getSupabaseClient()
-    .from('profiles')
-    .select('*')
-    .eq('id', userId)
-    .single();
+  const { data } = await getSupabaseClient().from('profiles').select('*').eq('id', userId).single();
   return data;
 };
 
 export const getAllProfiles = async () => {
-  const { data } = await getSupabaseClient()
-    .from('profiles')
-    .select('*')
-    .order('created_at', { ascending: false });
+  const { data } = await getSupabaseClient().from('profiles').select('*').order('created_at', { ascending: false });
   return data ?? [];
 };
 
