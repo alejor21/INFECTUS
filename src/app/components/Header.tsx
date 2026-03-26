@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Bell, Menu, Activity, PlayCircle, Sun, Moon, Loader2, ChevronRight, Building2, Calendar, LogOut } from 'lucide-react';
+import { Bell, Menu, Activity, PlayCircle, Sun, Moon, Loader2, ChevronRight, Building2, Calendar, LogOut, BookOpen } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router';
 import { toast } from 'sonner';
 import { useAuth } from '../../contexts/AuthContext';
@@ -239,6 +239,18 @@ export function Header({ onMenuOpen, onStartTour }: HeaderProps) {
           </div>
 
           {/* Theme toggle */}
+          {onStartTour && (
+            <button
+              onClick={onStartTour}
+              className="hidden lg:inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 dark:border-gray-800 dark:text-gray-200 dark:hover:bg-gray-800"
+              title="Abrir guía rápida"
+            >
+              <BookOpen className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+              Guía rápida
+            </button>
+          )}
+
+          {/* Theme toggle */}
           <button
             onClick={toggleTheme}
             className="p-2.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
@@ -294,7 +306,7 @@ export function Header({ onMenuOpen, onStartTour }: HeaderProps) {
                   className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                 >
                   <PlayCircle className="w-4 h-4 text-teal-600" />
-                  Ver tour de bienvenida
+                  Abrir guía rápida
                 </button>
                 <button
                   onClick={() => {

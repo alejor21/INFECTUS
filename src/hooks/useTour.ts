@@ -15,7 +15,7 @@ export const TOUR_STEPS: TourStep[] = [
     id: 'welcome',
     title: 'Bienvenido a INFECTUS',
     description:
-      'Esta guía interactiva te muestra dónde empezar para registrar intervenciones, revisar analíticas y configurar tu hospital.',
+      'Esta guia te muestra por donde empezar para cargar informacion, revisar analiticas y dejar el hospital listo sin perder tiempo.',
     targetId: null,
     position: 'center',
   },
@@ -23,7 +23,7 @@ export const TOUR_STEPS: TourStep[] = [
     id: 'tour-dashboard',
     title: 'Dashboard',
     description:
-      'Aquí ves el resumen clínico del hospital: actividad reciente, nivel PROA, meses cargados y acciones sugeridas para continuar.',
+      'Aqui ves el resumen clinico del hospital: actividad reciente, nivel PROA, meses cargados y el siguiente paso recomendado.',
     targetId: 'tour-dashboard',
     position: 'right',
   },
@@ -31,7 +31,7 @@ export const TOUR_STEPS: TourStep[] = [
     id: 'tour-hospitales',
     title: 'Hospitales',
     description:
-      'En esta sección creas hospitales, subes el Excel PROA y revisas el historial de archivos cargados.',
+      'En esta seccion creas hospitales, subes el Excel PROA y revisas si la informacion del periodo quedo cargada correctamente.',
     targetId: 'tour-hospitales',
     position: 'right',
   },
@@ -39,23 +39,23 @@ export const TOUR_STEPS: TourStep[] = [
     id: 'tour-evaluaciones',
     title: 'Evaluaciones',
     description:
-      'Aquí registras cada intervención del equipo PROA, continúas borradores y consultas el detalle de evaluaciones previas.',
+      'Aqui registras evaluaciones, continuas borradores y revisas el detalle de intervenciones previas del equipo PROA.',
     targetId: 'tour-evaluaciones',
     position: 'right',
   },
   {
     id: 'tour-analytics',
-    title: 'Analíticas',
+    title: 'Analiticas',
     description:
-      'Usa esta vista para identificar tendencias, servicios con mayor carga y oportunidades de mejora del programa.',
+      'Usa esta vista para identificar tendencias, servicios con mayor carga y oportunidades de mejora antes de tomar decisiones del programa.',
     targetId: 'tour-analytics',
     position: 'right',
   },
   {
     id: 'tour-configuracion',
-    title: 'Configuración',
+    title: 'Configuracion',
     description:
-      'Desde aquí actualizas tu perfil, el hospital activo, usuarios y preferencias de uso.',
+      'Desde aqui actualizas tu perfil, el hospital activo, usuarios y preferencias de uso.',
     targetId: 'tour-configuracion',
     position: 'right',
   },
@@ -63,7 +63,7 @@ export const TOUR_STEPS: TourStep[] = [
     id: 'tour-reportes',
     title: 'Reportes',
     description:
-      'Exporta resúmenes y documentos para comités clínicos, auditorías o seguimiento institucional.',
+      'Exporta resumenes y documentos para comites clinicos, auditorias o seguimiento institucional.',
     targetId: 'tour-reportes',
     position: 'right',
   },
@@ -71,7 +71,7 @@ export const TOUR_STEPS: TourStep[] = [
     id: 'finish',
     title: 'Todo listo',
     description:
-      'Ya conoces las funciones principales. Cuando quieras, vuelve a abrir esta guía desde el menú del usuario.',
+      'Ya conoces las funciones principales. Cuando quieras, vuelve a abrir esta guia desde el boton de guia rapida en la parte superior.',
     targetId: null,
     position: 'center',
   },
