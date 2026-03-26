@@ -522,18 +522,13 @@ export function Hospitales() {
   if (view === 'list') {
     return (
       <div className="p-4 lg:p-8">
-        {/* Header */}
         <div className="flex flex-wrap items-center justify-between gap-3 mb-6 lg:mb-8">
           <div>
             <div className="mb-1 flex items-center gap-2">
-              <h1 className="text-3xl font-bold text-slate-900 dark:text-white">
-                Gestión de Hospitales
-              </h1>
+              <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Gestion de hospitales</h1>
               <InfoTooltip content="Gestiona los hospitales donde aplicas el Programa PROA" />
             </div>
-            <p className="text-gray-500 text-sm">
-              Administre los hospitales registrados y sus archivos de datos
-            </p>
+            <p className="text-gray-500 text-sm">Crea hospitales, carga archivos Excel y revisa el estado de la informacion institucional.</p>
           </div>
           {canCreate && (
             <button
@@ -541,9 +536,25 @@ export function Hospitales() {
               className="flex min-h-[44px] items-center space-x-2 rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-teal-700"
             >
               <Plus className="w-4 h-4" />
-              <span>Nuevo Hospital</span>
+              <span>Crear hospital</span>
             </button>
           )}
+        </div>
+
+        <div className="mb-6 rounded-2xl border border-teal-100 bg-teal-50 p-4 shadow-sm">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-teal-900">Que hacer aqui primero</p>
+              <p className="mt-1 text-sm text-teal-700">
+                Crea el hospital, sube el Excel del periodo y luego entra al dashboard del hospital para revisar indicadores y archivos cargados.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2 text-xs font-medium text-teal-700">
+              <span className="rounded-full border border-teal-200 bg-white px-3 py-1">1. Crear hospital</span>
+              <span className="rounded-full border border-teal-200 bg-white px-3 py-1">2. Subir Excel</span>
+              <span className="rounded-full border border-teal-200 bg-white px-3 py-1">3. Revisar dashboard</span>
+            </div>
+          </div>
         </div>
 
         {hospitals.length > 0 && (
