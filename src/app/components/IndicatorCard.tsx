@@ -1,4 +1,4 @@
-import { LucideIcon, CheckCircle, AlertTriangle, TrendingUp } from 'lucide-react';
+import { AlertTriangle, CheckCircle, LucideIcon, TrendingUp } from 'lucide-react';
 
 interface IndicatorCardProps {
   icon: LucideIcon;
@@ -8,81 +8,73 @@ interface IndicatorCardProps {
   target: string;
   status: 'achieved' | 'progress' | 'warning';
   description: string;
-  trend?: number;
-  trendDirection?: 'up' | 'down';
 }
 
-export function IndicatorCard({ icon: Icon, title, value, unit, target, status, description }: IndicatorCardProps) {
-  const statusConfig = {
-    achieved: {
-      bgColor: 'bg-green-50',
-      borderColor: 'border-green-200',
-      iconColor: 'text-green-600',
-      textColor: 'text-green-700',
-      label: 'Objetivo cumplido',
-      StatusIcon: CheckCircle,
-    },
-    progress: {
-      bgColor: 'bg-blue-50',
-      borderColor: 'border-blue-200',
-      iconColor: 'text-blue-600',
-      textColor: 'text-blue-700',
-      label: 'En progreso',
-      StatusIcon: TrendingUp,
-    },
-    warning: {
-      bgColor: 'bg-yellow-50',
-      borderColor: 'border-yellow-200',
-      iconColor: 'text-yellow-600',
-      textColor: 'text-yellow-700',
-      label: 'Requiere atención',
-      StatusIcon: AlertTriangle,
-    },
-  };
+const statusConfig = {
+  achieved: {
+    badgeClassName:
+      'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300',
+    label: 'Dentro del objetivo',
+    iconClassName: 'text-emerald-600 dark:text-emerald-300',
+    Icon: CheckCircle,
+  },
+  progress: {
+    badgeClassName:
+      'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+    label: 'Vigilar tendencia',
+    iconClassName: 'text-blue-600 dark:text-blue-300',
+    Icon: TrendingUp,
+  },
+  warning: {
+    badgeClassName:
+      'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
+    label: 'Requiere revisión',
+    iconClassName: 'text-amber-600 dark:text-amber-300',
+    Icon: AlertTriangle,
+  },
+} as const;
 
+export function IndicatorCard({
+  icon: Icon,
+  title,
+  value,
+  unit,
+  target,
+  status,
+  description,
+}: IndicatorCardProps) {
   const config = statusConfig[status];
-  const StatusIcon = config.StatusIcon;
+  const StatusIcon = config.Icon;
 
   return (
-    <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
-      <div className="flex items-start justify-between mb-4">
-        <div className="w-12 h-12 rounded-lg flex items-center justify-center" style={{ backgroundColor: '#0F8B8D' }}>
-          <Icon className="w-6 h-6 text-white" />
+    <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm transition-shadow duration-200 hover:shadow-md dark:border-gray-800 dark:bg-gray-900">
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-teal-50 text-teal-600 dark:bg-teal-900/30 dark:text-teal-300">
+          <Icon className="h-6 w-6" />
         </div>
-        <div className={`flex items-center space-x-1 px-2 py-1 rounded-md ${config.bgColor} ${config.borderColor} border`}>
-          <StatusIcon className={`w-3 h-3 ${config.iconColor}`} />
-          <span className={`text-xs font-medium ${config.textColor}`}>{config.label}</span>
-        </div>
-      </div>
-
-      <h3 className="text-sm font-medium text-gray-600 mb-3">{title}</h3>
-
-      <div className="flex items-baseline space-x-2 mb-2">
-        <span className="text-3xl font-bold" style={{ color: '#0B3C5D' }}>
-          {value}
-        </span>
-        <span className="text-lg text-gray-500">{unit}</span>
-      </div>
-
-      <div className="flex items-center space-x-2 mb-4">
-        <span className="text-sm text-gray-600">Objetivo:</span>
-        <span className="text-sm font-semibold" style={{ color: '#0F8B8D' }}>
-          {target}{unit}
-        </span>
-      </div>
-
-      {/* Progress bar */}
-      <div className="w-full bg-gray-200 rounded-full h-2 mb-3">
         <div
-          className="h-2 rounded-full transition-all"
-          style={{
-            width: `${Math.min((parseFloat(String(value)) / parseFloat(target)) * 100, 100)}%`,
-            backgroundColor: '#0F8B8D',
-          }}
-        />
+          className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium ${config.badgeClassName}`}
+        >
+          <StatusIcon className={`h-3.5 w-3.5 ${config.iconClassName}`} />
+          {config.label}
+        </div>
       </div>
 
-      <p className="text-xs text-gray-600 leading-relaxed">{description}</p>
+      <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">{title}</h3>
+
+      <div className="mt-3 flex items-baseline gap-2">
+        <span className="text-3xl font-bold text-gray-900 dark:text-white">{value}</span>
+        {unit ? <span className="text-base text-gray-500 dark:text-gray-400">{unit}</span> : null}
+      </div>
+
+      <div className="mt-3 rounded-xl bg-gray-50 px-3 py-2 dark:bg-gray-950/60">
+        <p className="text-xs font-medium text-gray-600 dark:text-gray-300">
+          Objetivo de referencia: {target}
+          {unit}
+        </p>
+      </div>
+
+      <p className="mt-4 text-sm leading-relaxed text-gray-500 dark:text-gray-400">{description}</p>
     </div>
   );
 }

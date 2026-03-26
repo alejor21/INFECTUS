@@ -1,10 +1,12 @@
-import { Download, Filter, TrendingUp, TrendingDown } from 'lucide-react';
+import { TrendingDown, TrendingUp } from 'lucide-react';
 
 export interface ProaIndicatorRow {
   codigo: string;
   indicador: string;
   valor: number;
   objetivo: number;
+  unidad?: '%' | 'días';
+  lowIsBetter?: boolean;
   tendencia: 'up' | 'down';
   frecuencia: string;
   ultimaActualizacion: string;
@@ -14,116 +16,135 @@ interface IndicatorsTableProps {
   rows?: ProaIndicatorRow[];
 }
 
+function isRowReached(row: ProaIndicatorRow): boolean {
+  if (row.lowIsBetter) {
+    return row.valor <= row.objetivo;
+  }
+
+  return row.valor >= row.objetivo;
+}
+
 export function IndicatorsTable({ rows = [] }: IndicatorsTableProps) {
-  const cumplidos = rows.filter((r) => r.valor >= r.objetivo).length;
-  const enProgreso = rows.filter((r) => r.valor < r.objetivo).length;
-  const promedio = rows.length > 0
-    ? Math.round(rows.reduce((acc, r) => acc + r.valor, 0) / rows.length * 10) / 10
-    : 0;
+  const cumplidos = rows.filter((row) => isRowReached(row)).length;
+  const enSeguimiento = rows.filter((row) => !isRowReached(row)).length;
+  const promedio =
+    rows.length > 0
+      ? Math.round((rows.reduce((accumulator, row) => accumulator + row.valor, 0) / rows.length) * 10) / 10
+      : 0;
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-      {/* Header */}
-      <div className="p-6 border-b border-gray-200">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold" style={{ color: '#0B3C5D' }}>
-            Tablero de seguimiento de indicadores
-          </h3>
-          <div className="flex items-center space-x-3">
-            <button className="flex items-center space-x-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-              <Filter className="w-4 h-4 text-gray-600" />
-              <span className="text-sm font-medium text-gray-700">Filtrar</span>
-            </button>
-            <button className="flex items-center space-x-2 px-4 py-2 rounded-lg text-white hover:opacity-90 transition-opacity" style={{ backgroundColor: '#0F8B8D' }}>
-              <Download className="w-4 h-4" />
-              <span className="text-sm font-medium">Exportar</span>
-            </button>
+    <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
+      <div className="border-b border-gray-200 p-6 dark:border-gray-800">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+          Tablero de seguimiento de indicadores
+        </h3>
+        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          Revisión rápida del estado actual de cada indicador clínico del programa PROA.
+        </p>
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <div className="rounded-xl bg-emerald-50 px-4 py-3 dark:bg-emerald-900/20">
+            <p className="text-xs font-medium text-emerald-700 dark:text-emerald-300">Objetivos cumplidos</p>
+            <p className="mt-1 text-2xl font-bold text-emerald-700 dark:text-emerald-300">{cumplidos}</p>
+          </div>
+          <div className="rounded-xl bg-amber-50 px-4 py-3 dark:bg-amber-900/20">
+            <p className="text-xs font-medium text-amber-700 dark:text-amber-300">En seguimiento</p>
+            <p className="mt-1 text-2xl font-bold text-amber-700 dark:text-amber-300">{enSeguimiento}</p>
+          </div>
+          <div className="rounded-xl bg-teal-50 px-4 py-3 dark:bg-teal-900/20">
+            <p className="text-xs font-medium text-teal-700 dark:text-teal-300">Promedio general</p>
+            <p className="mt-1 text-2xl font-bold text-teal-700 dark:text-teal-300">{promedio}</p>
           </div>
         </div>
       </div>
 
-      {/* Table */}
       <div className="overflow-x-auto">
         <table className="w-full">
-          <thead className="bg-gray-50 border-b border-gray-200">
+          <thead className="bg-gray-50 dark:bg-gray-950/50">
             <tr>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Código</th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Indicador</th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Valor actual</th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Objetivo</th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Estado</th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Frecuencia</th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Actualización</th>
+              <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                Código
+              </th>
+              <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                Indicador
+              </th>
+              <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                Valor actual
+              </th>
+              <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                Objetivo
+              </th>
+              <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                Estado
+              </th>
+              <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                Frecuencia
+              </th>
+              <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                Actualización
+              </th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-6 py-8 text-center text-sm text-gray-500">
-                  Sin datos disponibles
+                <td colSpan={7} className="px-6 py-10 text-center text-sm text-gray-500 dark:text-gray-400">
+                  Sin datos disponibles.
                 </td>
               </tr>
             ) : (
-              rows.map((row, idx) => (
-                <tr key={idx} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="text-sm font-mono font-medium" style={{ color: '#0B3C5D' }}>{row.codigo}</span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="text-sm font-medium text-gray-900">{row.indicador}</span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="text-sm font-bold" style={{ color: row.valor >= row.objetivo ? '#0F8B8D' : '#F59E0B' }}>
-                      {row.valor}%
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="text-sm text-gray-600">{row.objetivo}%</span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center space-x-2">
-                      {row.tendencia === 'up' ? (
-                        <>
-                          <TrendingUp className="w-4 h-4 text-green-600" />
-                          <span className="text-sm font-medium text-green-600">Cumplido</span>
-                        </>
-                      ) : (
-                        <>
-                          <TrendingDown className="w-4 h-4 text-yellow-600" />
-                          <span className="text-sm font-medium text-yellow-600">En progreso</span>
-                        </>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="px-2 py-1 text-xs font-medium rounded-md bg-blue-100 text-blue-700">{row.frecuencia}</span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="text-sm text-gray-600">{row.ultimaActualizacion}</span>
-                  </td>
-                </tr>
-              ))
+              rows.map((row) => {
+                const reached = isRowReached(row);
+                const unit = row.unidad ?? '%';
+
+                return (
+                  <tr
+                    key={row.codigo}
+                    className="transition-colors duration-200 hover:bg-gray-50 dark:hover:bg-gray-800/50"
+                  >
+                    <td className="px-6 py-4 text-sm font-semibold text-gray-700 dark:text-gray-300">{row.codigo}</td>
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white">{row.indicador}</td>
+                    <td className="px-6 py-4 text-sm font-semibold text-gray-900 dark:text-white">
+                      {row.valor}
+                      {unit}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
+                      {row.objetivo}
+                      {unit}
+                    </td>
+                    <td className="px-6 py-4">
+                      <div
+                        className={`inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-xs font-medium ${
+                          reached
+                            ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300'
+                            : 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-300'
+                        }`}
+                      >
+                        {reached ? (
+                          <>
+                            <TrendingUp className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-300" />
+                            <span>Cumplido</span>
+                          </>
+                        ) : (
+                          <>
+                            <TrendingDown className="h-3.5 w-3.5 text-amber-600 dark:text-amber-300" />
+                            <span>En seguimiento</span>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700 dark:bg-blue-900/20 dark:text-blue-300">
+                        {row.frecuencia}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">{row.ultimaActualizacion}</td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
-      </div>
-
-      {/* Footer Summary */}
-      <div className="p-6 border-t border-gray-200 bg-gray-50">
-        <div className="grid grid-cols-3 gap-6">
-          <div className="text-center">
-            <div className="text-2xl font-bold text-green-600 mb-1">{cumplidos}</div>
-            <div className="text-xs text-gray-600">Objetivos cumplidos</div>
-          </div>
-          <div className="text-center border-l border-r border-gray-300">
-            <div className="text-2xl font-bold text-yellow-600 mb-1">{enProgreso}</div>
-            <div className="text-xs text-gray-600">En progreso</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold" style={{ color: '#0B3C5D' }}>{promedio}%</div>
-            <div className="text-xs text-gray-600">Cumplimiento promedio</div>
-          </div>
-        </div>
       </div>
     </div>
   );
