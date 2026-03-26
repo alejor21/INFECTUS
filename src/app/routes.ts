@@ -13,6 +13,7 @@ import { Comparativa } from "./pages/Comparativa";
 import { Alertas } from "./pages/Alertas";
 import { CalculadoraDDD } from "./pages/CalculadoraDDD";
 import { Pacientes } from "./pages/Pacientes";
+import { ComponentShowcase } from "./pages/ComponentShowcase";
 import { ProtectedRoute, LoginRoute } from "./components/ProtectedRoute";
 import { EvaluacionLayout } from "../modules/evaluacion/components/EvaluacionLayout";
 import { EvaluacionInstituciones } from "../modules/evaluacion/pages/EvaluacionInstituciones";
@@ -61,6 +62,7 @@ export const router = createBrowserRouter([
           { path: "pacientes", Component: Pacientes },
           { path: "comparativa", Component: Comparativa },
           { path: "calculadora-ddd", Component: CalculadoraDDD },
+          { path: "componentes", Component: ComponentShowcase },
         ],
       },
     ],
