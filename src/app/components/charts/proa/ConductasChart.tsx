@@ -11,6 +11,9 @@ interface ConductasChartProps {
   analysis: string[];
   isLoading: boolean;
   onExport: () => void;
+  chartHeightClassName?: string;
+  showExportButton?: boolean;
+  showAnalysis?: boolean;
 }
 
 export function ConductasChart({
@@ -21,9 +24,21 @@ export function ConductasChart({
   analysis,
   isLoading,
   onExport,
+  chartHeightClassName,
+  showExportButton,
+  showAnalysis,
 }: ConductasChartProps) {
   return (
-    <ProaChartCard id={cardId} title={title} subtitle={subtitle} analysis={analysis} onExport={onExport}>
+    <ProaChartCard
+      id={cardId}
+      title={title}
+      subtitle={subtitle}
+      analysis={analysis}
+      onExport={onExport}
+      chartHeightClassName={chartHeightClassName}
+      showExportButton={showExportButton}
+      showAnalysis={showAnalysis}
+    >
       {isLoading ? (
         <ChartLoadingState message="Preparando grafica de conductas..." />
       ) : data.length === 0 ? (

@@ -12,10 +12,8 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import { useNavigate } from 'react-router';
-import { toast } from 'sonner';
 import { useAnalytics } from '../../hooks/useAnalytics';
 import { useProaCharts } from '../../hooks/useProaCharts';
-import { useAuth } from '../../contexts/AuthContext';
 import {
   getAdherenciaAnalysis,
   getCommitteeHospitalLabel,
@@ -23,7 +21,12 @@ import {
   getServicioAnalysis,
   getTipoIntervencionAnalysis,
 } from '../../lib/analytics/proaCommittee';
-import { generateProaPPTX } from '../../utils/generatePPTX';
+import {
+  COMMITTEE_RANGE_LABEL,
+  filterRecordsByCommitteeRange,
+  parseCommitteeDate,
+  type CommitteeRange,
+} from '../../lib/analytics/proaPeriods';
 import { exportAllChartsAsPNG, exportChartAsPNG, exportChartsPDF } from '../../utils/exportCharts';
 import type { InterventionRecord } from '../../types';
 import { AdherenciaChart } from '../components/charts/proa/AdherenciaChart';
@@ -38,10 +41,9 @@ import { IndicatorsTable } from '../components/IndicatorsTable';
 import type { ProaIndicatorRow } from '../components/IndicatorsTable';
 import { useHospitalContext } from '../components/Layout';
 import { ObjectivesProgressChart } from '../components/ObjectivesProgressChart';
+import { ProaReportModal } from '../components/ProaReportModal';
 import { QualityMetricsChart } from '../components/QualityMetricsChart';
 import { InfoTooltip } from '../components/Tooltip';
-
-type CommitteeRange = '1m' | '6m' | '12m' | 'all';
 
 function pct(count: number, total: number): number {
   if (total === 0) {
@@ -89,43 +91,6 @@ const DATE_RANGE_LABEL: Record<'1m' | '6m' | '12m' | 'all', string> = {
   all: 'Todos los datos',
 };
 
-const COMMITTEE_RANGE_LABEL: Record<CommitteeRange, string> = {
-  '1m': 'Ultimo mes',
-  '6m': 'Ultimos 6 meses',
-  '12m': 'Ultimo ano',
-  all: 'Todo el periodo',
-};
-
-function parseCommitteeDate(value: string): Date | null {
-  const trimmed = (value ?? '').trim();
-  const dmy = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (dmy) {
-    return new Date(Number(dmy[3]), Number(dmy[2]) - 1, Number(dmy[1]));
-  }
-
-  const ymd = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (ymd) {
-    return new Date(Number(ymd[1]), Number(ymd[2]) - 1, Number(ymd[3]));
-  }
-
-  return null;
-}
-
-function filterRecordsByCommitteeRange(records: InterventionRecord[], range: CommitteeRange): InterventionRecord[] {
-  if (range === 'all') {
-    return records;
-  }
-
-  const months = range === '1m' ? 1 : range === '6m' ? 6 : 12;
-  const now = new Date();
-  const cutoff = new Date(now.getFullYear(), now.getMonth() - months, now.getDate());
-
-  return records.filter((record) => {
-    const parsedDate = parseCommitteeDate(record.fecha);
-    return parsedDate ? parsedDate >= cutoff : false;
-  });
-}
-
 function getStatusText(value: number, objective: number, lowIsBetter = false): string {
   if (lowIsBetter) {
     if (value <= objective) {
@@ -152,12 +117,12 @@ function getStatusText(value: number, objective: number, lowIsBetter = false): s
 
 export function IndicadoresPROA() {
   const navigate = useNavigate();
-  const { profile } = useAuth();
   const { allRawRecords, dateRange, hospitals, selectedHospitalObj } = useHospitalContext();
   const { kpis, monthlyCompliance, records, loading, cultivosPreRate, avgTherapyDays } = useAnalytics();
 
   const [committeeHospitalId, setCommitteeHospitalId] = useState<string>(selectedHospitalObj?.id ?? 'all');
   const [committeeRange, setCommitteeRange] = useState<CommitteeRange>(dateRange);
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
 
   const totalRecords = records.length;
   const actualizacion = latestDateLabel(records);
@@ -369,27 +334,6 @@ export function IndicadoresPROA() {
     await exportChartsPDF(scope, committeePeriodLabel, committeePdfData);
   }
 
-  async function handleExportPptx() {
-    const scope = getCommitteeHospitalLabel(committeeHospitalName);
-    const authorLabel = profile?.full_name
-      ? `${profile.full_name} - ${profile.role ?? 'Equipo PROA'}`
-      : 'Equipo PROA';
-
-    await generateProaPPTX({
-      hospitalName: scope,
-      period: committeePeriodLabel,
-      authors: [authorLabel],
-      adherenciaData,
-      conductasData,
-      servicioData,
-      tipoData,
-    });
-  }
-
-  function handlePendingExport(label: string) {
-    toast.info(`${label} se habilitara en el siguiente bloque.`);
-  }
-
   if (noHospitalSelected) {
     return (
       <div className="p-8">
@@ -430,6 +374,13 @@ export function IndicadoresPROA() {
 
   return (
     <div className={loading ? 'p-8 opacity-50' : 'p-8'}>
+      <ProaReportModal
+        isOpen={isReportModalOpen}
+        onClose={() => setIsReportModalOpen(false)}
+        initialHospitalId={committeeHospitalId === 'all' ? undefined : committeeHospitalId}
+        initialScope={committeeHospitalId === 'all' ? 'global' : 'hospital'}
+      />
+
       <div className="mb-8">
         <div className="mb-1 flex items-center gap-2">
           <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Analiticas PROA</h1>
@@ -617,7 +568,7 @@ export function IndicadoresPROA() {
               <button
                 type="button"
                 onClick={() => {
-                  void handleExportPptx();
+                  setIsReportModalOpen(true);
                 }}
                 className="inline-flex min-h-[44px] items-center gap-2 rounded-xl bg-teal-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-teal-700"
               >

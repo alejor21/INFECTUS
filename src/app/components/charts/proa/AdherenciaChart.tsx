@@ -12,6 +12,9 @@ interface AdherenciaChartProps {
   analysis: string[];
   isLoading: boolean;
   onExport: () => void;
+  chartHeightClassName?: string;
+  showExportButton?: boolean;
+  showAnalysis?: boolean;
 }
 
 interface PieLabelProps {
@@ -50,6 +53,9 @@ export function AdherenciaChart({
   analysis,
   isLoading,
   onExport,
+  chartHeightClassName,
+  showExportButton,
+  showAnalysis,
 }: AdherenciaChartProps) {
   const chartData = [
     { name: `Adheridos (${data.adheridos})`, shortName: 'Adheridos', value: data.adheridos, color: '#1E6091' },
@@ -57,7 +63,16 @@ export function AdherenciaChart({
   ].filter((item) => item.value > 0);
 
   return (
-    <ProaChartCard id={cardId} title={title} subtitle={subtitle} analysis={analysis} onExport={onExport}>
+    <ProaChartCard
+      id={cardId}
+      title={title}
+      subtitle={subtitle}
+      analysis={analysis}
+      onExport={onExport}
+      chartHeightClassName={chartHeightClassName}
+      showExportButton={showExportButton}
+      showAnalysis={showAnalysis}
+    >
       {isLoading ? (
         <ChartLoadingState message="Preparando grafica de adherencia..." />
       ) : chartData.length === 0 ? (

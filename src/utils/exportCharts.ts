@@ -12,12 +12,17 @@ export interface ExportChartsPDFData {
   charts: PdfChartPage[];
 }
 
-const CHART_EXPORT_ORDER = [
+interface ChartExportTarget {
+  id: string;
+  filename: string;
+}
+
+const CHART_EXPORT_ORDER: ChartExportTarget[] = [
   { id: 'proa-chart-tipo-intervencion', filename: 'TipoIntervencion' },
   { id: 'proa-chart-servicio', filename: 'PorServicio' },
   { id: 'proa-chart-conductas', filename: 'Conductas' },
   { id: 'proa-chart-adherencia', filename: 'Adherencia' },
-] as const;
+];
 
 function sanitizeFilePart(value: string): string {
   return value
@@ -59,13 +64,18 @@ export async function exportChartAsPNG(elementId: string, filename: string): Pro
   }
 }
 
-export async function exportAllChartsAsPNG(hospitalName: string, period: string): Promise<void> {
-  const toastId = toast.loading('Exportando grafica 1 de 4...');
+export async function exportAllChartsAsPNG(
+  hospitalName: string,
+  period: string,
+  chartTargets: ChartExportTarget[] = CHART_EXPORT_ORDER,
+): Promise<void> {
+  const totalCharts = chartTargets.length;
+  const toastId = toast.loading(`Exportando grafica 1 de ${totalCharts}...`);
 
   try {
-    for (let index = 0; index < CHART_EXPORT_ORDER.length; index += 1) {
-      const chart = CHART_EXPORT_ORDER[index];
-      toast.loading(`Exportando grafica ${index + 1} de 4...`, { id: toastId });
+    for (let index = 0; index < chartTargets.length; index += 1) {
+      const chart = chartTargets[index];
+      toast.loading(`Exportando grafica ${index + 1} de ${totalCharts}...`, { id: toastId });
       const canvas = await captureChartCanvas(chart.id);
       downloadDataUrl(
         canvas.toDataURL('image/png'),
@@ -73,7 +83,7 @@ export async function exportAllChartsAsPNG(hospitalName: string, period: string)
       );
     }
 
-    toast.success('4 graficas descargadas', { id: toastId });
+    toast.success(`${totalCharts} graficas descargadas`, { id: toastId });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'No fue posible exportar las graficas.';
     toast.error(message, { id: toastId });

@@ -12,6 +12,9 @@ interface DistribucionServicioChartProps {
   analysis: string[];
   isLoading: boolean;
   onExport: () => void;
+  chartHeightClassName?: string;
+  showExportButton?: boolean;
+  showAnalysis?: boolean;
 }
 
 interface PieLabelProps {
@@ -52,6 +55,9 @@ export function DistribucionServicioChart({
   analysis,
   isLoading,
   onExport,
+  chartHeightClassName,
+  showExportButton,
+  showAnalysis,
 }: DistribucionServicioChartProps) {
   const chartData = data.map((item, index) => ({
     ...item,
@@ -60,7 +66,16 @@ export function DistribucionServicioChart({
   }));
 
   return (
-    <ProaChartCard id={cardId} title={title} subtitle={subtitle} analysis={analysis} onExport={onExport}>
+    <ProaChartCard
+      id={cardId}
+      title={title}
+      subtitle={subtitle}
+      analysis={analysis}
+      onExport={onExport}
+      chartHeightClassName={chartHeightClassName}
+      showExportButton={showExportButton}
+      showAnalysis={showAnalysis}
+    >
       {isLoading ? (
         <ChartLoadingState message="Preparando grafica por servicio..." />
       ) : chartData.length === 0 ? (

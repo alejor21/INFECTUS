@@ -12,6 +12,9 @@ interface TipoIntervencionCommitteeChartProps {
   analysis: string[];
   isLoading: boolean;
   onExport: () => void;
+  chartHeightClassName?: string;
+  showExportButton?: boolean;
+  showAnalysis?: boolean;
 }
 
 interface PieLabelProps {
@@ -56,6 +59,9 @@ export function TipoIntervencionCommitteeChart({
   analysis,
   isLoading,
   onExport,
+  chartHeightClassName,
+  showExportButton,
+  showAnalysis,
 }: TipoIntervencionCommitteeChartProps) {
   const chartData = data.filter((item) => item.count > 0).map((item) => ({
     ...item,
@@ -64,7 +70,16 @@ export function TipoIntervencionCommitteeChart({
   }));
 
   return (
-    <ProaChartCard id={cardId} title={title} subtitle={subtitle} analysis={analysis} onExport={onExport}>
+    <ProaChartCard
+      id={cardId}
+      title={title}
+      subtitle={subtitle}
+      analysis={analysis}
+      onExport={onExport}
+      chartHeightClassName={chartHeightClassName}
+      showExportButton={showExportButton}
+      showAnalysis={showAnalysis}
+    >
       {isLoading ? (
         <ChartLoadingState message="Preparando grafica por tipo de intervencion..." />
       ) : chartData.length === 0 ? (
