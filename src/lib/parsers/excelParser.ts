@@ -13,6 +13,7 @@ export interface ParseResult {
     validRows: number;
     errorRows: number;
     missingColumns: string[];
+    warnings: string[];
   };
 }
 
@@ -43,46 +44,200 @@ for (const [spanishHeader, camelKey] of Object.entries(EXCEL_COLUMN_MAP)) {
 
 // Known column variations for fuzzy matching
 const COLUMN_ALIASES: Record<string, keyof InterventionRecord> = {
+  // Fecha
   'fecha': 'fecha',
   'fechaingreso': 'fecha',
   'fecha ingreso': 'fecha',
+  'fecha de ingreso': 'fecha',
+  'fecha evaluacion': 'fecha',
+  'fecha de evaluacion': 'fecha',
+  'date': 'fecha',
+  
+  // Tipo intervención
   'tipo intervencion': 'tipoIntervencion',
   'tipodeintervencion': 'tipoIntervencion',
   'tipo': 'tipoIntervencion',
+  'tipo de intervencion ic proa rev': 'tipoIntervencion',
+  'intervencion': 'tipoIntervencion',
+  
+  // Paciente
   'paciente': 'nombre',
   'nombrep': 'nombre',
+  'nombre paciente': 'nombre',
+  'nombre del paciente': 'nombre',
+  'nombre completo': 'nombre',
+  
+  // Cédula
   'cedula': 'admisionCedula',
   'identificacion': 'admisionCedula',
+  'admision': 'admisionCedula',
+  'admision cedula': 'admisionCedula',
+  'numero documento': 'admisionCedula',
+  'documento': 'admisionCedula',
+  'id paciente': 'admisionCedula',
+  
+  // Cama
   'habitacion': 'cama',
+  'cuarto': 'cama',
+  'ubicacion': 'cama',
+  
+  // Servicio
   'area': 'servicio',
   'unidad': 'servicio',
+  'departamento': 'servicio',
+  'seccion': 'servicio',
+  
+  // Edad
   'anos': 'edad',
   'edad anos': 'edad',
+  'years': 'edad',
+  'edad paciente': 'edad',
+  
+  // Código diagnóstico
+  'cod diagnostico': 'codDiagnostico',
+  'codigo diagnostico': 'codDiagnostico',
+  'cie10': 'codDiagnostico',
+  'cie 10': 'codDiagnostico',
+  'codigo cie': 'codDiagnostico',
+  
+  // Diagnóstico
   'dx': 'diagnostico',
+  'diagnostico principal': 'diagnostico',
+  'diagnostico infeccioso': 'diagnostico',
+  
+  // IAAS
   'iaas': 'iaas',
+  'es iaas': 'iaas',
+  'iaas sn': 'iaas',
+  
+  // Tipo IAAS
   'tipo iaas': 'tipoIaas',
+  'tipo de iaas': 'tipoIaas',
+  'clasificacion iaas': 'tipoIaas',
+  
+  // Aprobación terapia
   'aprobo': 'aproboTerapia',
   'aprobacion': 'aproboTerapia',
+  'se aprobo': 'aproboTerapia',
+  'se aprobo terapia': 'aproboTerapia',
+  'se aprobo terapia antimicrobiana': 'aproboTerapia',
+  'aprobo terapia': 'aproboTerapia',
+  'aprobada': 'aproboTerapia',
+  
+  // Causa no aprobación
+  'causa no aprobacion': 'causaNoAprobacion',
+  'si no se aprobo causa': 'causaNoAprobacion',
+  'causa': 'causaNoAprobacion',
+  'motivo no aprobacion': 'causaNoAprobacion',
+  'razon no aprobacion': 'causaNoAprobacion',
+  
+  // Combinación no adecuada
+  'combinacion no adecuada': 'combinacionNoAdecuada',
+  'combinacion inadecuada': 'combinacionNoAdecuada',
+  
+  // Extensión no adecuada
+  'extension no adecuada': 'extensionNoAdecuada',
+  'extension inadecuada': 'extensionNoAdecuada',
+  'duracion no adecuada': 'extensionNoAdecuada',
+  
+  // Ajuste por cultivo
+  'ajuste por cultivo': 'ajustePorCultivo',
+  'ajuste cultivo': 'ajustePorCultivo',
+  'se realizo ajuste de terapia antimicrobiana guiado por reporte de sensibilidad en cultivo': 'ajustePorCultivo',
+  'ajuste terapia cultivo': 'ajustePorCultivo',
+  
+  // Correlación diagnóstico antibiótico
+  'correlacion dx antibiotico': 'correlacionDxAntibiotico',
+  'diagnostico infeccioso correlacionado con terapia antibiotica': 'correlacionDxAntibiotico',
+  'correlacion diagnostico': 'correlacionDxAntibiotico',
+  
+  // Terapia empírica apropiada
   'terapia apropiada': 'terapiaEmpricaApropiada',
+  'terapia empirica apropiada': 'terapiaEmpricaApropiada',
+  'la terapia empirica fue apropiada primera linea': 'terapiaEmpricaApropiada',
+  'empirica apropiada': 'terapiaEmpricaApropiada',
+  'primera linea': 'terapiaEmpricaApropiada',
+  
+  // Cultivos previos
   'cultivo': 'cultivosPrevios',
   'cultivos': 'cultivosPrevios',
+  'cultivos previos': 'cultivosPrevios',
+  'se realizo toma de cultivos previo al inicio antimicrobiano': 'cultivosPrevios',
+  'toma de cultivos': 'cultivosPrevios',
+  'tomo cultivo': 'cultivosPrevios',
+  
+  // Conducta general
   'conducta': 'conductaGeneral',
+  'conducta general cambio a terapia a oral dirige terapia mantiene desescalona escalona': 'conductaGeneral',
+  'conducta terapeutica': 'conductaGeneral',
+  'accion': 'conductaGeneral',
+  
+  // Antibiótico 01
   'antibiotico 1': 'antibiotico01',
   'antibiotico1': 'antibiotico01',
   'atb 1': 'antibiotico01',
   'atb01': 'antibiotico01',
+  'antibiotico 01': 'antibiotico01',
+  'antibiotico01': 'antibiotico01',
+  'medicamento 1': 'antibiotico01',
+  'atb1': 'antibiotico01',
+  
+  // Acciones medicamento 01
+  'acciones medicamento 01': 'accionesMed01',
+  'acciones med 01': 'accionesMed01',
+  'accion medicamento 1': 'accionesMed01',
+  'accion 1': 'accionesMed01',
+  
+  // Días terapia 01
+  'dias 1': 'diasTerapiaMed01',
+  'dias1': 'diasTerapiaMed01',
+  'dias terapia 1': 'diasTerapiaMed01',
+  'dias terapia medicamento 01': 'diasTerapiaMed01',
+  'dias terapia medicamento01': 'diasTerapiaMed01',
+  'duracion 1': 'diasTerapiaMed01',
+  
+  // Antibiótico 02
   'antibiotico 2': 'antibiotico02',
   'antibiotico2': 'antibiotico02',
   'atb 2': 'antibiotico02',
   'atb02': 'antibiotico02',
-  'dias 1': 'diasTerapiaMed01',
-  'dias1': 'diasTerapiaMed01',
-  'dias terapia 1': 'diasTerapiaMed01',
+  'antibiotico 02': 'antibiotico02',
+  'antibiotico02': 'antibiotico02',
+  'medicamento 2': 'antibiotico02',
+  'atb2': 'antibiotico02',
+  
+  // Acciones medicamento 02
+  'acciones medicamento 02': 'accionesMed02',
+  'acciones med 02': 'accionesMed02',
+  'accion medicamento 2': 'accionesMed02',
+  'accion 2': 'accionesMed02',
+  
+  // Días terapia 02
   'dias 2': 'diasTerapiaMed02',
   'dias2': 'diasTerapiaMed02',
   'dias terapia 2': 'diasTerapiaMed02',
+  'dias terapia medicamento 02': 'diasTerapiaMed02',
+  'dias terapia medicamento02': 'diasTerapiaMed02',
+  'duracion 2': 'diasTerapiaMed02',
+  
+  // Observaciones
   'obs': 'observaciones',
   'comentarios': 'observaciones',
+  'notas': 'observaciones',
+  'nota': 'observaciones',
+  
+  // Microbiología
+  'resultado cultivo': 'resultadoCultivo',
+  'resultado': 'resultadoCultivo',
+  'tipo de muestra': 'tipoMuestra',
+  'muestra': 'tipoMuestra',
+  'organismo aislado': 'organismoAislado',
+  'germen': 'organismoAislado',
+  'microorganismo': 'organismoAislado',
+  'sensibilidad vancomicina': 'sensibilidadVancomicina',
+  'vancomicina': 'sensibilidadVancomicina',
+  'sensibilidad meropenem': 'sensibilidadMeropenem',
+  'meropenem': 'sensibilidadMeropenem',
 };
 
 /**
@@ -141,12 +296,55 @@ function cleanCellValue(value: unknown): string {
   const str = String(value).trim();
   
   // Replace various "empty" indicators
-  if (str === '' || str === '-' || str === 'N/A' || str.toLowerCase() === 'n/a') {
+  const emptyIndicators = ['', '-', 'n/a', 'na', 'null', 'undefined', 'ninguno', 'ninguna', '.', '...'];
+  if (emptyIndicators.includes(str.toLowerCase())) {
     return '';
   }
   
   return str;
 }
+
+/**
+ * Normalizes boolean-like values to 'SI' or 'NO'.
+ * Returns original value if not a boolean-like value.
+ */
+function normalizeBooleanValue(value: string): string {
+  const cleaned = value.trim().toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, ''); // Remove accents
+  
+  // Values that mean "yes"
+  const yesValues = ['si', 'sí', 's', 'yes', 'y', '1', 'true', 'verdadero', 'x', 'aplica'];
+  if (yesValues.includes(cleaned)) {
+    return 'SI';
+  }
+  
+  // Values that mean "no"
+  const noValues = ['no', 'n', '0', 'false', 'falso', 'no aplica', 'na'];
+  if (noValues.includes(cleaned)) {
+    return 'NO';
+  }
+  
+  // Return original if not boolean-like
+  return value;
+}
+
+/**
+ * Fields that should be normalized to SI/NO
+ */
+const BOOLEAN_FIELDS: (keyof InterventionRecord)[] = [
+  'iaas',
+  'aproboTerapia',
+  'combinacionNoAdecuada',
+  'extensionNoAdecuada',
+  'ajustePorCultivo',
+  'correlacionDxAntibiotico',
+  'terapiaEmpricaApropiada',
+  'cultivosPrevios',
+  'blee',
+  'carbapenemasa',
+  'mrsa',
+];
 const AI_FIELD_TO_RECORD: Partial<Record<string, keyof InterventionRecord>> = {
   fechaIngreso:  'fecha',
   servicio:      'servicio',
@@ -260,6 +458,7 @@ export async function parseInterventionFile(file: File): Promise<ParseResult> {
   // ── Step 3: Parse all rows ─────────────────────────────────────────────────
   const valid: InterventionRecord[] = [];
   const errors: { row: number; message: string }[] = [];
+  const warnings: string[] = [];
 
   rows.forEach((rawRow, index) => {
     const excelRowNumber = index + 2; // row 1 = header in Excel
@@ -277,8 +476,18 @@ export async function parseInterventionFile(file: File): Promise<ParseResult> {
       if (camelKey) {
         // Special handling for date fields
         if (camelKey === 'fecha') {
-          mapped[camelKey] = parseExcelDate(rawValue);
-        } else {
+          const dateVal = parseExcelDate(rawValue);
+          if (!dateVal && rawValue) {
+            warnings.push(`Fila ${excelRowNumber}: Fecha "${rawValue}" no reconocida`);
+          }
+          mapped[camelKey] = dateVal;
+        } 
+        // Normalize boolean fields (SI/NO)
+        else if (BOOLEAN_FIELDS.includes(camelKey)) {
+          const cleaned = cleanCellValue(rawValue);
+          mapped[camelKey] = cleaned ? normalizeBooleanValue(cleaned) : '';
+        }
+        else {
           mapped[camelKey] = cleanCellValue(rawValue);
         }
       }
@@ -331,7 +540,8 @@ export async function parseInterventionFile(file: File): Promise<ParseResult> {
       totalRows: rows.length,
       validRows: valid.length,
       errorRows: errors.length,
-      missingColumns
+      missingColumns,
+      warnings
     }
   };
 }

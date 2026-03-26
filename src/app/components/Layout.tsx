@@ -26,11 +26,11 @@ export function Layout() {
 
   return (
     <HospitalProvider>
-      <div className="min-h-screen bg-gray-50 overflow-x-hidden">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 overflow-x-hidden">
         {/* Dark backdrop — mobile sidebar overlay */}
         {isMobileMenuOpen && (
           <div
-            className="fixed inset-0 z-30 bg-black/50 lg:hidden"
+            className="fixed inset-0 z-30 bg-black/50 backdrop-blur-sm lg:hidden transition-opacity"
             onClick={() => setIsMobileMenuOpen(false)}
           />
         )}
@@ -46,7 +46,7 @@ export function Layout() {
         />
 
         {/* Main content: full-width on mobile, offset by sidebar on desktop */}
-        <main className="pt-16 lg:ml-64">
+        <main className="pt-16 lg:pt-[88px] lg:ml-64 min-h-screen">
           <Outlet />
         </main>
 

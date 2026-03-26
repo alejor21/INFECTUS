@@ -12,9 +12,19 @@ import {
   UserRound,
   Calculator,
   ClipboardCheck,
+  BarChart3,
+  LogOut,
+  ChevronDown,
+  Globe,
+  Loader2,
 } from 'lucide-react';
-import { Link, useLocation } from 'react-router';
+import { Link, useLocation, useNavigate } from 'react-router';
+import { useState } from 'react';
 import { useAlertBadge } from '../../hooks/useAlerts';
+import { useAuth } from '../../contexts/AuthContext';
+import { useHospitalContext } from '../../contexts/HospitalContext';
+import { signOut } from '../../lib/supabase/auth';
+import { toast } from 'sonner';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -40,7 +50,13 @@ interface SidebarProps {
 
 export function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
   const location = useLocation();
+  const navigate = useNavigate();
   const unreadAlerts = useAlertBadge();
+  const { profile } = useAuth();
+  const { selectedHospitalObj, setSelectedHospitalObj, hospitals } = useHospitalContext();
+  
+  const [showHospitalDropdown, setShowHospitalDropdown] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
   const navGroups: NavGroup[] = [
     {
@@ -53,45 +69,28 @@ export function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
           title: 'Ver métricas y resumen del programa PROA',
         },
         {
+          icon: BarChart3,
+          label: 'Analíticas',
+          path: '/indicadores-proa',
+          title: 'Analíticas y métricas del programa',
+        },
+        {
+          icon: ClipboardCheck,
+          label: 'Evaluaciones',
+          path: '/evaluacion',
+          title: 'Evaluaciones PROA',
+        },
+        {
           icon: Building2,
           label: 'Hospitales',
           path: '/hospitales',
           title: 'Gestionar hospitales e instituciones',
         },
         {
-          icon: UserRound,
-          label: 'Pacientes',
-          path: '/pacientes',
-          title: 'Gestionar pacientes registrados',
-        },
-      ],
-    },
-    {
-      label: 'PROGRAMA PROA',
-      items: [
-        {
-          icon: ClipboardCheck,
-          label: 'Evaluación PROA',
-          path: '/evaluacion',
-          title: 'Evaluar el programa PROA con 61 criterios estandarizados',
-        },
-        {
-          icon: Activity,
-          label: 'Indicadores PROA',
-          path: '/indicadores-proa',
-          title: 'Monitorear indicadores clave del programa PROA',
-        },
-        {
-          icon: Pill,
-          label: 'Consumo Antibióticos',
-          path: '/consumo-antibioticos',
-          title: 'Análisis del consumo de antibióticos (DDD/DOT)',
-        },
-        {
-          icon: Shield,
-          label: 'Resistencias',
-          path: '/resistencias',
-          title: 'Perfil institucional de resistencia bacteriana',
+          icon: Settings,
+          label: 'Configuración',
+          path: '/configuracion',
+          title: 'Configuración del sistema',
         },
       ],
     },
@@ -99,40 +98,35 @@ export function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
       label: 'ANÁLISIS',
       items: [
         {
+          icon: Pill,
+          label: 'Antibióticos',
+          path: '/consumo-antibioticos',
+          title: 'Consumo de antibióticos (DDD/DOT)',
+        },
+        {
+          icon: Shield,
+          label: 'Resistencias',
+          path: '/resistencias',
+          title: 'Perfil de resistencia bacteriana',
+        },
+        {
           icon: GitCompare,
           label: 'Comparativa',
           path: '/comparativa',
-          title: 'Comparar métricas entre hospitales o períodos',
-        },
-        {
-          icon: Calculator,
-          label: 'Calculadora DDD',
-          path: '/calculadora-ddd',
-          title: 'Calcular Dosis Diarias Definidas para cualquier antibiótico',
+          title: 'Comparar métricas',
         },
         {
           icon: FileText,
           label: 'Reportes',
           path: '/reportes',
-          title: 'Generar y exportar reportes en PDF',
+          title: 'Generar reportes',
         },
         {
           icon: Bell,
           label: 'Alertas',
           path: '/alertas',
-          title: 'Alertas y notificaciones del sistema',
+          title: 'Alertas del sistema',
           badge: unreadAlerts,
-        },
-      ],
-    },
-    {
-      label: 'SISTEMA',
-      items: [
-        {
-          icon: Settings,
-          label: 'Configuración',
-          path: '/configuracion',
-          title: 'Configuración del hospital y programa PROA',
         },
       ],
     },
@@ -153,30 +147,57 @@ export function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
     return false;
   }
 
+  const handleSignOut = async () => {
+    setIsSigningOut(true);
+    try {
+      await signOut();
+      localStorage.removeItem('infectus-onboarding-complete');
+      navigate('/login', { replace: true });
+    } catch {
+      toast.error('Error al cerrar sesión');
+      setIsSigningOut(false);
+    }
+  };
+
+  const initials =
+    profile?.avatar_initials ??
+    (profile?.full_name
+      ? profile.full_name
+          .split(' ')
+          .map((n) => n[0])
+          .join('')
+          .slice(0, 2)
+          .toUpperCase()
+      : '?');
+
+  const roleLabels: Record<string, string> = {
+    administrador: 'Administrador',
+    infectologo: 'Infectólogo',
+    medico: 'Médico',
+    visor: 'Visitante',
+  };
+
   return (
     <aside
-      className={`w-64 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 flex flex-col h-screen fixed left-0 top-0 z-40 transition-transform duration-300 ${
+      className={`w-64 bg-white dark:bg-gray-950 border-r border-gray-200 dark:border-gray-800 flex flex-col h-screen fixed left-0 top-0 z-40 transition-transform duration-300 ease-in-out ${
         isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
       }`}
     >
-      {/* Logo + mobile close button */}
-      <div className="h-16 flex items-center px-6 border-b border-gray-200 dark:border-gray-700 shrink-0">
+      {/* Logo */}
+      <div className="h-16 flex items-center px-5 border-b border-gray-200 dark:border-gray-800 shrink-0">
         <div className="flex items-center justify-between w-full">
-          <div className="flex items-center space-x-3">
-            <div
-              className="w-10 h-10 rounded-lg flex items-center justify-center"
-              style={{ backgroundColor: '#0B3C5D' }}
-            >
-              <Activity className="w-6 h-6 text-white" />
+          <Link to="/dashboard" className="flex items-center gap-3 group">
+            <div className="w-9 h-9 rounded-xl bg-teal-600 flex items-center justify-center shadow-sm group-hover:shadow-md transition-shadow">
+              <Activity className="w-5 h-5 text-white" />
             </div>
-            <span className="font-bold text-xl" style={{ color: '#0B3C5D' }}>
-              Infectus
+            <span className="font-bold text-lg tracking-tight text-gray-900 dark:text-white">
+              INFECTUS
             </span>
-          </div>
+          </Link>
 
           <button
             onClick={onClose}
-            className="lg:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 min-h-[44px] min-w-[44px] flex items-center justify-center"
+            className="lg:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 transition-colors"
             aria-label="Cerrar menú"
           >
             <X className="w-5 h-5" />
@@ -184,14 +205,66 @@ export function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
         </div>
       </div>
 
+      {/* Hospital Selector */}
+      <div className="px-3 py-3 border-b border-gray-200 dark:border-gray-800">
+        <div className="relative">
+          <button
+            onClick={() => setShowHospitalDropdown(!showHospitalDropdown)}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 border border-gray-200 dark:border-gray-800 transition-colors"
+          >
+            {selectedHospitalObj ? (
+              <Building2 className="w-4 h-4 text-teal-600 shrink-0" />
+            ) : (
+              <Globe className="w-4 h-4 text-gray-400 shrink-0" />
+            )}
+            <span className="flex-1 text-left text-sm font-medium text-gray-700 dark:text-gray-200 truncate">
+              {selectedHospitalObj?.name ?? 'Todos los hospitales'}
+            </span>
+            <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${showHospitalDropdown ? 'rotate-180' : ''}`} />
+          </button>
+
+          {showHospitalDropdown && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setShowHospitalDropdown(false)} />
+              <div className="absolute left-0 right-0 top-full mt-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl shadow-lg overflow-hidden z-20 max-h-64 overflow-y-auto">
+                <button
+                  onClick={() => { setSelectedHospitalObj(null); setShowHospitalDropdown(false); }}
+                  className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors ${
+                    !selectedHospitalObj ? 'bg-teal-50 dark:bg-teal-900/20 text-teal-700 dark:text-teal-400' : 'text-gray-700 dark:text-gray-300'
+                  }`}
+                >
+                  <Globe className="w-4 h-4 shrink-0" />
+                  <span className="font-medium">Todos los hospitales</span>
+                </button>
+                {hospitals.map((h) => (
+                  <button
+                    key={h.id}
+                    onClick={() => { setSelectedHospitalObj(h); setShowHospitalDropdown(false); }}
+                    className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors ${
+                      selectedHospitalObj?.id === h.id ? 'bg-teal-50 dark:bg-teal-900/20 text-teal-700 dark:text-teal-400' : 'text-gray-700 dark:text-gray-300'
+                    }`}
+                  >
+                    <Building2 className="w-4 h-4 shrink-0" />
+                    <div className="text-left truncate">
+                      <div className="font-medium truncate">{h.name}</div>
+                      <div className="text-xs text-gray-500 dark:text-gray-500">{h.city}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
       {/* Navigation */}
-      <nav className="flex-1 px-4 py-4 overflow-y-auto space-y-1">
+      <nav className="flex-1 px-3 py-4 overflow-y-auto">
         {navGroups.map((group, groupIdx) => (
-          <div key={group.label} className={groupIdx > 0 ? 'pt-3' : ''}>
-            <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider px-3 mb-1">
+          <div key={group.label} className={groupIdx > 0 ? 'mt-6' : ''}>
+            <p className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide px-3 mb-2">
               {group.label}
             </p>
-            <div className="space-y-0.5">
+            <div className="space-y-1">
               {group.items.map((item) => {
                 const active = itemIsActive(item.path);
                 const badge = item.badge ?? 0;
@@ -203,17 +276,16 @@ export function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
                     onClick={onClose}
                     id={TOUR_IDS[item.path]}
                     title={item.title}
-                    className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors min-h-[44px] ${
+                    className={`group w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 ${
                       active
-                        ? 'text-white'
-                        : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
+                        ? 'bg-teal-600/10 text-teal-600 dark:text-teal-400 border-l-2 border-teal-600 ml-0'
+                        : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800/50 hover:text-gray-900 dark:hover:text-gray-200'
                     }`}
-                    style={active ? { backgroundColor: '#0F8B8D' } : {}}
                   >
-                    <item.icon className="w-5 h-5 shrink-0" />
+                    <item.icon className={`w-5 h-5 shrink-0 ${active ? '' : 'group-hover:scale-105 transition-transform'}`} />
                     <span className="text-sm font-medium flex-1">{item.label}</span>
                     {badge > 0 && (
-                      <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-red-500 text-white text-xs font-bold leading-none">
+                      <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-red-500 text-white text-xs font-bold">
                         {badge > 99 ? '99+' : badge}
                       </span>
                     )}
@@ -225,10 +297,32 @@ export function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
         ))}
       </nav>
 
-      {/* Footer */}
-      <div className="p-4 border-t border-gray-200 dark:border-gray-700 shrink-0">
-        <div className="text-xs text-gray-500 dark:text-gray-500 text-center">
-          v1.0.2 • © 2026 Infectus
+      {/* User section */}
+      <div className="p-3 border-t border-gray-200 dark:border-gray-800 shrink-0">
+        <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-900">
+          <div className="w-9 h-9 rounded-full bg-teal-600 flex items-center justify-center text-white text-sm font-semibold shrink-0">
+            {initials}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+              {profile?.full_name ?? 'Usuario'}
+            </p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+              {roleLabels[profile?.role ?? ''] ?? profile?.role ?? '—'}
+            </p>
+          </div>
+          <button
+            onClick={handleSignOut}
+            disabled={isSigningOut}
+            className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-800 text-gray-500 hover:text-red-600 dark:hover:text-red-400 transition-colors disabled:opacity-50"
+            title="Cerrar sesión"
+          >
+            {isSigningOut ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <LogOut className="w-4 h-4" />
+            )}
+          </button>
         </div>
       </div>
     </aside>

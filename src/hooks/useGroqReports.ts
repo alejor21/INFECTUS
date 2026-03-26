@@ -23,6 +23,11 @@ Respondes siempre en español, de forma clara, profesional y concisa.
 Cuando generes reportes, usa formato estructurado con secciones.
 Basa tus respuestas ÚNICAMENTE en los datos que te proporcionen, no inventes cifras.`;
 
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return String(error);
+}
+
 export function useGroqReports(snapshot: AnalyticsSnapshot) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -50,8 +55,8 @@ Servicios activos: ${snapshot.topServices.join(', ')}
         SYSTEM_PROMPT,
         `Genera un informe ejecutivo PROA completo basado en estos datos:\n${buildContext()}\n\nEl informe debe incluir: 1) Resumen ejecutivo, 2) Hallazgos principales, 3) Alertas y puntos críticos, 4) Recomendaciones prioritarias, 5) Conclusión.`,
       );
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      setError(getErrorMessage(e));
       return '';
     } finally {
       setLoading(false);
@@ -66,8 +71,8 @@ Servicios activos: ${snapshot.topServices.join(', ')}
         SYSTEM_PROMPT,
         `Analiza estos datos PROA y genera SOLO las alertas epidemiológicas y clínicas que requieren atención inmediata:\n${buildContext()}\n\nFormato: lista de alertas con nivel de prioridad (ALTA/MEDIA/BAJA) y acción recomendada.`,
       );
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      setError(getErrorMessage(e));
       return '';
     } finally {
       setLoading(false);
@@ -82,8 +87,8 @@ Servicios activos: ${snapshot.topServices.join(', ')}
         SYSTEM_PROMPT,
         `Contexto de datos actuales:\n${buildContext()}\n\nPregunta del médico: ${userQuestion}`,
       );
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      setError(getErrorMessage(e));
       return '';
     } finally {
       setLoading(false);

@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react';
+import type { User } from '@supabase/supabase-js';
 import { getSupabaseClient } from '../lib/supabase/client';
 import { getProfile } from '../lib/supabase/auth';
 
@@ -13,7 +14,7 @@ export interface Profile {
 }
 
 interface AuthContextType {
-  user: any | null;
+  user: User | null;
   profile: Profile | null;
   loading: boolean;
   isAdmin: boolean;
@@ -29,7 +30,7 @@ export const AuthContext = createContext<AuthContextType>({
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 

@@ -1,9 +1,12 @@
 import { Settings, User, Bell, Database, Shield, Mail, Building2, Target, Trash2 } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useFileUpload } from '../../hooks/useFileUpload';
 import { useDataManagement } from '../../hooks/useDataManagement';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth, type Profile } from '../../contexts/AuthContext';
 import { getAllProfiles, updateProfile, signUp } from '../../lib/supabase/auth';
+import { ConfirmDialog } from '../components/ConfirmDialog';
+
+type UserRole = 'administrador' | 'infectologo' | 'medico' | 'visor';
 
 export function Configuracion() {
   const [activeTab, setActiveTab] = useState('general');
@@ -20,26 +23,36 @@ export function Configuracion() {
 
   // Usuarios tab state
   const { isAdmin, profile: currentProfile } = useAuth();
-  const [profiles, setProfiles] = useState<any[]>([]);
+  const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loadingProfiles, setLoadingProfiles] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
   const [addName, setAddName] = useState('');
   const [addEmail, setAddEmail] = useState('');
   const [addPassword, setAddPassword] = useState('');
-  const [addRole, setAddRole] = useState('medico');
+  const [addRole, setAddRole] = useState<UserRole>('medico');
   const [addError, setAddError] = useState<string | null>(null);
   const [addLoading, setAddLoading] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editRole, setEditRole] = useState('medico');
+  const [editRole, setEditRole] = useState<UserRole>('medico');
   const [editActive, setEditActive] = useState(true);
   const [editLoading, setEditLoading] = useState(false);
 
-  useEffect(() => {
-    getAllProfiles().then((data) => {
+  // Delete confirmation state
+  const [deleteConfirmHospital, setDeleteConfirmHospital] = useState<string | null>(null);
+  const [showDeleteAllConfirm, setShowDeleteAllConfirm] = useState(false);
+
+  const loadProfiles = useCallback(async () => {
+    try {
+      const data = await getAllProfiles();
       setProfiles(data);
+    } finally {
       setLoadingProfiles(false);
-    });
+    }
   }, []);
+
+  useEffect(() => {
+    loadProfiles();
+  }, [loadProfiles]);
 
   const handleAddUser = async () => {
     if (!addName.trim() || !addEmail.trim() || !addPassword.trim()) return;
@@ -57,15 +70,15 @@ export function Configuracion() {
     setAddEmail('');
     setAddPassword('');
     setAddRole('medico');
-    getAllProfiles().then(setProfiles);
+    loadProfiles();
   };
 
   const handleSaveEdit = async (userId: string) => {
     setEditLoading(true);
-    await updateProfile(userId, { role: editRole as any, is_active: editActive });
+    await updateProfile(userId, { role: editRole, is_active: editActive });
     setEditLoading(false);
     setEditingId(null);
-    getAllProfiles().then(setProfiles);
+    loadProfiles();
   };
 
   function formatTimestamp(ts: string): string {
@@ -277,7 +290,7 @@ export function Configuracion() {
                       <label className="block text-xs font-medium text-gray-700 mb-1">Rol</label>
                       <select
                         value={addRole}
-                        onChange={(e) => setAddRole(e.target.value)}
+                        onChange={(e) => setAddRole(e.target.value as UserRole)}
                         className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none"
                       >
                         <option value="medico">Médico</option>
@@ -321,7 +334,7 @@ export function Configuracion() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
-                      {profiles.map((p: any) => {
+                      {profiles.map((p) => {
                         const isCurrentUser = currentProfile?.id === p.id;
                         const avatarInitials = (
                           p.avatar_initials ??
@@ -340,7 +353,7 @@ export function Configuracion() {
                               <td className="px-6 py-4">
                                 <select
                                   value={editRole}
-                                  onChange={(e) => setEditRole(e.target.value)}
+                                  onChange={(e) => setEditRole(e.target.value as UserRole)}
                                   className="border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none"
                                 >
                                   <option value="medico">Médico</option>
@@ -729,11 +742,7 @@ export function Configuracion() {
                             <td className="px-4 py-3">
                               <button
                                 disabled={deleteStatus === 'deleting'}
-                                onClick={() => {
-                                  if (window.confirm(`¿Eliminar todos los registros de "${h.hospitalName}"? Esta acción no se puede deshacer.`)) {
-                                    deleteHospital(h.hospitalName);
-                                  }
-                                }}
+                                onClick={() => setDeleteConfirmHospital(h.hospitalName)}
                                 className="flex items-center space-x-1 px-3 py-1.5 text-xs font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors"
                               >
                                 <Trash2 className="w-3 h-3" />
@@ -751,11 +760,7 @@ export function Configuracion() {
                   <div className="flex justify-end pt-4 border-t border-gray-200">
                     <button
                       disabled={deleteStatus === 'deleting'}
-                      onClick={() => {
-                        if (window.confirm('¿Eliminar TODOS los datos del sistema? Esta acción es irreversible y borrará los registros de todos los hospitales.')) {
-                          deleteAll();
-                        }
-                      }}
+                      onClick={() => setShowDeleteAllConfirm(true)}
                       className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -768,6 +773,37 @@ export function Configuracion() {
           )}
         </div>
       </div>
+
+      {/* Confirm dialogs */}
+      <ConfirmDialog
+        isOpen={deleteConfirmHospital !== null}
+        onClose={() => setDeleteConfirmHospital(null)}
+        onConfirm={() => {
+          if (deleteConfirmHospital) {
+            deleteHospital(deleteConfirmHospital);
+          }
+          setDeleteConfirmHospital(null);
+        }}
+        title="Eliminar datos del hospital"
+        description={`¿Eliminar todos los registros de "${deleteConfirmHospital}"? Esta acción no se puede deshacer.`}
+        confirmLabel="Eliminar"
+        variant="danger"
+        loading={deleteStatus === 'deleting'}
+      />
+
+      <ConfirmDialog
+        isOpen={showDeleteAllConfirm}
+        onClose={() => setShowDeleteAllConfirm(false)}
+        onConfirm={() => {
+          deleteAll();
+          setShowDeleteAllConfirm(false);
+        }}
+        title="Eliminar TODOS los datos"
+        description="Esta acción es irreversible y borrará los registros de todos los hospitales. ¿Estás seguro?"
+        confirmLabel="Eliminar todo"
+        variant="danger"
+        loading={deleteStatus === 'deleting'}
+      />
     </div>
   );
 }

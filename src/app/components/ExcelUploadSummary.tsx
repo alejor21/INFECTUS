@@ -1,6 +1,6 @@
 import { CheckCircle2, AlertCircle, AlertTriangle, FileSpreadsheet, X } from 'lucide-react';
-import type { ParseResult } from '../lib/parsers/excelParser';
-import type { UploadResult } from '../types';
+import type { ParseResult } from '../../lib/parsers/excelParser';
+import type { UploadResult } from '../../types';
 
 interface ExcelUploadSummaryProps {
   parseResult: ParseResult | null;
@@ -12,7 +12,9 @@ export function ExcelUploadSummary({ parseResult, uploadResult, onClose }: Excel
   if (!parseResult && !uploadResult) return null;
 
   const hasErrors = (uploadResult?.errors.length ?? 0) > 0;
-  const hasWarnings = (parseResult?.summary.missingColumns.length ?? 0) > 0 || (parseResult?.aiWarning);
+  const hasWarnings = (parseResult?.summary.missingColumns.length ?? 0) > 0 || 
+                      (parseResult?.summary.warnings?.length ?? 0) > 0 ||
+                      (parseResult?.aiWarning);
   const isSuccess = !hasErrors && uploadResult && uploadResult.inserted > 0;
 
   return (
@@ -128,6 +130,30 @@ export function ExcelUploadSummary({ parseResult, uploadResult, onClose }: Excel
                     <p className="text-sm text-amber-700 dark:text-amber-300">
                       {parseResult.aiWarning}
                     </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Data warnings (dates, etc.) */}
+              {parseResult?.summary.warnings && parseResult.summary.warnings.length > 0 && (
+                <div className="flex items-start gap-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+                  <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="font-medium text-amber-900 dark:text-amber-100 mb-2">
+                      ⚠️ Advertencias de datos ({parseResult.summary.warnings.length})
+                    </p>
+                    <div className="max-h-32 overflow-y-auto space-y-1">
+                      {parseResult.summary.warnings.slice(0, 5).map((warning, idx) => (
+                        <p key={idx} className="text-sm text-amber-700 dark:text-amber-300">
+                          {warning}
+                        </p>
+                      ))}
+                      {parseResult.summary.warnings.length > 5 && (
+                        <p className="text-xs text-amber-600 dark:text-amber-400 italic">
+                          ... y {parseResult.summary.warnings.length - 5} advertencias más
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}

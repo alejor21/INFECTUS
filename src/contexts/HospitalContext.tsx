@@ -141,25 +141,28 @@ export function HospitalProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // Load hospitals on mount
+  // Load hospitals on mount (refreshHospitals is stable via useCallback with empty deps)
   useEffect(() => {
     let isMounted = true;
     refreshHospitals().then(() => {
       if (!isMounted) return;
     });
     return () => { isMounted = false; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [refreshHospitals]);
 
-  // Load all records on mount
+  // Load all records on mount (refreshRecords is stable via useCallback with empty deps)
   useEffect(() => {
     let isMounted = true;
     refreshRecords().then(() => {
       if (!isMounted) return;
     });
     return () => { isMounted = false; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [refreshRecords]);
+
+  // Reset dateRange when selected hospital changes
+  useEffect(() => {
+    setDateRange('6m');
+  }, [selectedHospitalObj]);
 
   // Reload files when selected hospital changes
   useEffect(() => {
