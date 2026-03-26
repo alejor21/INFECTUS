@@ -69,6 +69,47 @@ export const updateHospital = async (id: string, updates: Partial<Hospital>) => 
   return getSupabaseClient().from('hospitals').update(updates).eq('id', id);
 };
 
+export const updateHospitalWithReferences = async (
+  hospital: Hospital,
+  updates: Partial<Hospital>,
+) => {
+  const supabase = getSupabaseClient();
+  const nextName = updates.name?.trim() ?? hospital.name;
+
+  const { data, error } = await supabase
+    .from('hospitals')
+    .update(updates)
+    .eq('id', hospital.id)
+    .select('*')
+    .single();
+
+  if (error) {
+    return { data: null, error };
+  }
+
+  if (nextName !== hospital.name) {
+    const [profilesUpdate, interventionsUpdate] = await Promise.all([
+      supabase
+        .from('profiles')
+        .update({ hospital_name: nextName })
+        .eq('hospital_name', hospital.name),
+      supabase
+        .from('interventions')
+        .update({ hospital_name: nextName })
+        .eq('hospital_name', hospital.name),
+    ]);
+
+    if (profilesUpdate.error || interventionsUpdate.error) {
+      return {
+        data: data as Hospital,
+        error: profilesUpdate.error ?? interventionsUpdate.error,
+      };
+    }
+  }
+
+  return { data: data as Hospital, error: null };
+};
+
 export const deleteHospital = async (id: string) => {
   return getSupabaseClient().from('hospitals').delete().eq('id', id);
 };

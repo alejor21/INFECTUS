@@ -19,6 +19,7 @@ interface AuthContextType {
   loading: boolean;
   isAdmin: boolean;
   isInfectologo: boolean;
+  refreshProfile: () => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextType>({
@@ -27,12 +28,27 @@ export const AuthContext = createContext<AuthContextType>({
   loading: true,
   isAdmin: false,
   isInfectologo: false,
+  refreshProfile: async () => {},
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const refreshProfile = async () => {
+    const sessionUser = getSupabaseClient().auth.getUser
+      ? (await getSupabaseClient().auth.getUser()).data.user
+      : user;
+
+    if (!sessionUser) {
+      setProfile(null);
+      return;
+    }
+
+    const profileData = await getProfile(sessionUser.id);
+    setProfile(profileData);
+  };
 
   useEffect(() => {
     const supabase = getSupabaseClient();
@@ -82,6 +98,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isAdmin: profile?.role === 'administrador',
         isInfectologo:
           profile?.role === 'infectologo' || profile?.role === 'administrador',
+        refreshProfile,
       }}
     >
       {children}

@@ -13,6 +13,7 @@ export const signUp = async (
   password: string,
   fullName: string,
   role: ProfileRole,
+  hospitalName?: string | null,
 ) => {
   const supabase = getSupabaseClient();
   const normalizedEmail = email.trim().toLowerCase();
@@ -45,6 +46,7 @@ export const signUp = async (
       full_name: normalizedName,
       email: normalizedEmail,
       role,
+      hospital_name: hospitalName ?? null,
       avatar_initials: initials,
       is_active: true,
     },
@@ -58,11 +60,48 @@ export const signUp = async (
   return data;
 };
 
+export const inviteUser = async (
+  email: string,
+  password: string,
+  fullName: string,
+  role: ProfileRole,
+  hospitalName?: string | null,
+) => {
+  const supabase = getSupabaseClient();
+  const {
+    data: { session: previousSession },
+  } = await supabase.auth.getSession();
+
+  const result = await signUp(email, password, fullName, role, hospitalName);
+
+  if (previousSession) {
+    const {
+      data: { user: currentUser },
+    } = await supabase.auth.getUser();
+
+    if (currentUser?.id !== previousSession.user.id) {
+      const { error: restoreError } = await supabase.auth.setSession({
+        access_token: previousSession.access_token,
+        refresh_token: previousSession.refresh_token,
+      });
+
+      if (restoreError) {
+        throw new Error('El usuario fue creado, pero no se pudo restaurar la sesión actual.');
+      }
+    }
+  }
+
+  return result;
+};
+
 export const sendPasswordReset = (email: string, redirectTo: string) =>
   getSupabaseClient().auth.resetPasswordForEmail(email.trim().toLowerCase(), { redirectTo });
 
 export const updatePassword = (password: string) =>
   getSupabaseClient().auth.updateUser({ password });
+
+export const updateCurrentUserMetadata = (data: Record<string, unknown>) =>
+  getSupabaseClient().auth.updateUser({ data });
 
 export const signOut = () => getSupabaseClient().auth.signOut();
 
@@ -82,6 +121,7 @@ export const updateProfile = async (
     full_name?: string;
     role?: string;
     hospital_name?: string;
+    avatar_initials?: string;
     is_active?: boolean;
   },
 ) => {
