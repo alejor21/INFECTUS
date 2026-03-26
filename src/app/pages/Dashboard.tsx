@@ -17,7 +17,9 @@ import {
 import { useAuth } from '../../contexts/AuthContext';
 import { useHospitalContext } from '../../contexts/HospitalContext';
 import { useDashboardStats } from '../../hooks/useDashboardStats';
+import { filterRecordsByMonth, getCurrentMonthValue } from '../../lib/analytics/proaPeriods';
 import { EmptyState } from '../components/EmptyState';
+import { ProaReportModal } from '../components/ProaReportModal';
 import { InfoTooltip } from '../components/Tooltip';
 import { WelcomeModal, shouldShowWelcome } from '../components/WelcomeModal';
 
@@ -126,11 +128,12 @@ const MODULE_CARDS: ModuleCard[] = [
 export function Dashboard() {
   const navigate = useNavigate();
   const { profile } = useAuth();
-  const { selectedHospitalObj } = useHospitalContext();
+  const { allRawRecords, selectedHospitalObj } = useHospitalContext();
   const { stats, loading: dataLoading, error, refresh } = useDashboardStats(selectedHospitalObj?.id ?? null);
 
   const [modulesOpen, setModulesOpen] = useState(false);
   const [showWelcome, setShowWelcome] = useState(false);
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
 
   useEffect(() => {
     const id = profile?.id;
@@ -145,6 +148,13 @@ export function Dashboard() {
   const firstName = profile?.full_name?.split(' ')[0] || 'Doctor';
   const level = stats?.proaLevel ?? null;
   const levelConf = level ? (LEVEL_BADGE[level] ?? null) : null;
+  const currentMonth = getCurrentMonthValue();
+  const currentMonthCount = selectedHospitalObj
+    ? filterRecordsByMonth(
+        allRawRecords.filter((record) => record.hospitalName === selectedHospitalObj.name),
+        currentMonth,
+      ).length
+    : 0;
 
   const recommendedAction: RecommendedAction = !hasHospital
     ? {
@@ -170,6 +180,13 @@ export function Dashboard() {
   return (
     <div className="mx-auto max-w-7xl space-y-8 px-4 py-8 sm:px-6">
       {showWelcome && profile?.id ? <WelcomeModal userId={profile.id} onDismiss={() => setShowWelcome(false)} /> : null}
+      <ProaReportModal
+        isOpen={isReportModalOpen}
+        onClose={() => setIsReportModalOpen(false)}
+        initialHospitalId={selectedHospitalObj?.id}
+        initialMonth={currentMonth}
+        initialScope="hospital"
+      />
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -308,6 +325,33 @@ export function Dashboard() {
           <p className="mt-2 text-xs text-gray-400 dark:text-gray-500">Fuente para analiticas automaticas</p>
         </div>
       </div>
+
+      {hasHospital ? (
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-teal-600 dark:text-teal-300">
+                Reporte mensual
+              </p>
+              <h2 className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
+                Generar reporte del comite
+              </h2>
+              <p className="mt-1 max-w-3xl text-sm text-gray-500 dark:text-gray-400">
+                Genera el PowerPoint y PDF del informe mensual PROA listo para presentar en comite.
+              </p>
+              <p className="mt-2 text-xs text-gray-400 dark:text-gray-500">
+                Basado en {currentMonthCount} evaluacion{currentMonthCount === 1 ? '' : 'es'} del periodo actual
+              </p>
+            </div>
+            <button
+              onClick={() => setIsReportModalOpen(true)}
+              className="inline-flex min-h-[44px] items-center justify-center rounded-xl bg-teal-600 px-4 py-2.5 text-sm font-medium text-white transition-all duration-200 hover:bg-teal-700"
+            >
+              Generar reporte
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {hasNoData ? (
         <div className="rounded-2xl border border-dashed border-gray-300 bg-white dark:border-gray-700 dark:bg-gray-900">

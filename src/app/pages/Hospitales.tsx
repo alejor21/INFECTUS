@@ -28,7 +28,9 @@ import { toast } from 'sonner';
 import { processAndSaveExcel } from '../../modules/excel/excelProcessor';
 import { useHospitalFiles } from '../../hooks/useHospitalFiles';
 import { useHospitalUploadStatuses } from '../../hooks/useHospitalUploadStatuses';
+import { getCurrentMonthValue } from '../../lib/analytics/proaPeriods';
 import { EmptyState } from '../components/EmptyState';
+import { ProaReportModal } from '../components/ProaReportModal';
 import { InfoTooltip } from '../components/Tooltip';
 
 const MONTH_NAMES = [
@@ -44,6 +46,12 @@ interface PendingFile {
   status: 'idle' | 'uploading' | 'done' | 'error';
   message: string;
   aiWarning?: string; // set when AI normalization was unavailable
+}
+
+interface ReportPromptState {
+  hospitalId: string;
+  month: string;
+  message: string;
 }
 
 function filesInRange(
@@ -119,6 +127,10 @@ function normalizeText(value: string | null | undefined): string {
     .replace(/[\u0300-\u036f]/g, '');
 }
 
+function toMonthValue(year: number, month: number): string {
+  return `${year}-${String(month).padStart(2, '0')}`;
+}
+
 export function Hospitales() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -166,6 +178,8 @@ export function Hospitales() {
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [reportPrompt, setReportPrompt] = useState<ReportPromptState | null>(null);
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Excel upload for new hospital form
@@ -222,6 +236,7 @@ export function Hospitales() {
     setShowDeleteConfirm(false);
     setPendingFiles([]);
     setDeleteConfirmId(null);
+    setReportPrompt(null);
     setActiveTab('info');
     setView('detail');
   }, [setSelectedHospitalObj]);
@@ -231,6 +246,7 @@ export function Hospitales() {
     setActiveHospital(null);
     setPendingFiles([]);
     setDeleteConfirmId(null);
+    setReportPrompt(null);
   }, []);
 
   // ── VIEW A: add hospital ──────────────────────────────────────────────────
@@ -458,6 +474,11 @@ export function Hospitales() {
             : p,
         ),
       );
+      setReportPrompt({
+        hospitalId: activeHospital.id,
+        month: toMonthValue(pf.year, pf.month),
+        message: `${inserted} registros listos para generar el reporte del comite.`,
+      });
       toast.success(`${inserted} registros cargados correctamente.`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -508,6 +529,11 @@ export function Hospitales() {
     if (result.success) {
       toast.success(`Excel actualizado: ${result.monthsFound.length} mes${result.monthsFound.length !== 1 ? 'es' : ''}, ${result.totalRows} registros.`);
       await refreshUploadStatuses();
+      setReportPrompt({
+        hospitalId,
+        month: result.monthsFound[result.monthsFound.length - 1] ?? getCurrentMonthValue(),
+        message: `Excel actualizado con ${result.totalRows} registros. Ya puedes generar el reporte del mes.`,
+      });
     } else {
       toast.error(result.error ?? 'Error al procesar el Excel.');
     }
@@ -821,24 +847,33 @@ export function Hospitales() {
   };
 
   return (
-    <div className="p-4 lg:p-8">
-      {/* Breadcrumb */}
-      <div className="flex items-center space-x-3 mb-4 lg:mb-8">
-        <button
-          onClick={backToList}
-          className="flex items-center space-x-1 text-gray-500 hover:text-gray-700 transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4" />
+    <>
+      <ProaReportModal
+        isOpen={isReportModalOpen}
+        onClose={() => setIsReportModalOpen(false)}
+        initialHospitalId={reportPrompt?.hospitalId ?? activeHospital?.id}
+        initialMonth={reportPrompt?.month}
+        initialScope="hospital"
+      />
+
+      <div className="p-4 lg:p-8">
+        {/* Breadcrumb */}
+        <div className="flex items-center space-x-3 mb-4 lg:mb-8">
+          <button
+            onClick={backToList}
+            className="flex items-center space-x-1 text-gray-500 hover:text-gray-700 transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
           <span className="text-sm">Hospitales</span>
         </button>
         <span className="text-gray-300">/</span>
         <span className="text-sm font-semibold text-slate-900 dark:text-white">
           {activeHospital?.name}
         </span>
-      </div>
+        </div>
 
       {/* Tabs */}
-      <div className="flex space-x-1 mb-6 border-b border-gray-200">
+        <div className="flex space-x-1 mb-6 border-b border-gray-200">
         {(['info', 'files'] as const).map((tab) => (
           <button
             key={tab}
@@ -852,10 +887,10 @@ export function Hospitales() {
             {tab === 'info' ? 'Información' : 'Archivos Excel'}
           </button>
         ))}
-      </div>
+        </div>
 
       {/* ── TAB: Información ── */}
-      {activeTab === 'info' && (
+        {activeTab === 'info' && (
         <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm max-w-2xl">
           {editError && <p className="text-sm text-red-600 mb-4">{editError}</p>}
           {editSaved && (
@@ -978,7 +1013,7 @@ export function Hospitales() {
       )}
 
       {/* ── TAB: Archivos Excel ── */}
-      {activeTab === 'files' && (
+        {activeTab === 'files' && (
         <div className="max-w-3xl">
 
           {/* ── TOP: Drop zone ── */}
@@ -1022,6 +1057,23 @@ export function Hospitales() {
             </p>
           </div>
           {/* ── Queue of pending files ── */}
+          {reportPrompt ? (
+            <div className="mb-4 rounded-xl border border-teal-200 bg-teal-50 p-4">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-teal-900">Carga completada</p>
+                  <p className="mt-1 text-sm text-teal-700">{reportPrompt.message}</p>
+                </div>
+                <button
+                  onClick={() => setIsReportModalOpen(true)}
+                  className="inline-flex min-h-[44px] items-center justify-center rounded-xl bg-teal-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-teal-700"
+                >
+                  Generar PowerPoint del mes
+                </button>
+              </div>
+            </div>
+          ) : null}
+
           {pendingFiles.length > 0 && (
             <div className="bg-white border border-gray-200 rounded-xl mb-6 overflow-hidden">
               <div className="px-4 py-3 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
@@ -1292,6 +1344,7 @@ export function Hospitales() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 }
