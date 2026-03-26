@@ -55,7 +55,7 @@ export function Header({ onMenuOpen, onStartTour }: HeaderProps) {
 
   // Close user menu on outside click
   useEffect(() => {
-    const handler = (e: MouseEvent) => {
+    const handleClick = (e: MouseEvent) => {
       if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
         setShowUserMenu(false);
       }
@@ -63,10 +63,22 @@ export function Header({ onMenuOpen, onStartTour }: HeaderProps) {
         setShowDateMenuMobile(false);
       }
     };
+
+    const handleKeydown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowUserMenu(false);
+        setShowDateMenuMobile(false);
+      }
+    };
+
     if (showUserMenu || showDateMenuMobile) {
-      document.addEventListener('mousedown', handler);
+      document.addEventListener('mousedown', handleClick);
+      document.addEventListener('keydown', handleKeydown);
     }
-    return () => { document.removeEventListener('mousedown', handler); };
+    return () => {
+      document.removeEventListener('mousedown', handleClick);
+      document.removeEventListener('keydown', handleKeydown);
+    };
   }, [showUserMenu, showDateMenuMobile]);
 
   const initials =
