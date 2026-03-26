@@ -43,6 +43,7 @@ export interface InterventionRecord {
 
 export interface KPIMetrics {
   antibioticUseRate: number;
+  avgTherapyDays: number;
   therapeuticAdequacy: number;
   iaasRate: number;
   guidelineCompliance: number;

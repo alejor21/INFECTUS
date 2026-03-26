@@ -11,6 +11,8 @@ import {
   calcIAASDistribution,
   calcConductaDistribution,
   calcMonthlyCompliance,
+  calcCultivosPreRate,
+  calcAvgTherapyDays,
   calcMRSARate,
   calcBLEERate,
   calcCarbapenemaseRate,
@@ -37,6 +39,8 @@ interface UseAnalyticsReturn {
   iaasDistribution: { type: string; count: number }[];
   conductaDistribution: { conducta: string; count: number }[];
   monthlyCompliance: { month: string; rate: number }[];
+  cultivosPreRate: number;
+  avgTherapyDays: number;
   records: InterventionRecord[];
   loading: boolean;
   error: string | null;
@@ -54,6 +58,7 @@ interface UseAnalyticsReturn {
 
 const EMPTY_KPIS: KPIMetrics = {
   antibioticUseRate: 0,
+  avgTherapyDays: 0,
   therapeuticAdequacy: 0,
   iaasRate: 0,
   guidelineCompliance: 0,
@@ -70,8 +75,10 @@ export function useAnalytics({ service }: UseAnalyticsParams = {}): UseAnalytics
 
   const kpis = useMemo<KPIMetrics>(() => {
     if (records.length === 0) return EMPTY_KPIS;
+    const avgTherapyDays = calcAvgTherapyDays(records);
     return {
-      antibioticUseRate: calcAntibioticUseRate(records),
+      antibioticUseRate: avgTherapyDays,
+      avgTherapyDays,
       therapeuticAdequacy: calcTherapeuticAdequacy(records),
       iaasRate: calcIAASRate(records, records.length),
       guidelineCompliance: calcGuidelineCompliance(records),
@@ -83,6 +90,8 @@ export function useAnalytics({ service }: UseAnalyticsParams = {}): UseAnalytics
   const iaasDistribution     = useMemo(() => calcIAASDistribution(records), [records]);
   const conductaDistribution = useMemo(() => calcConductaDistribution(records), [records]);
   const monthlyCompliance    = useMemo(() => calcMonthlyCompliance(records), [records]);
+  const cultivosPreRate      = useMemo(() => calcCultivosPreRate(records), [records]);
+  const avgTherapyDays       = useMemo(() => calcAvgTherapyDays(records), [records]);
   const mrsaRate             = useMemo(() => calcMRSARate(records), [records]);
   const bleeRate             = useMemo(() => calcBLEERate(records), [records]);
   const carbapenemaseRate    = useMemo(() => calcCarbapenemaseRate(records), [records]);
@@ -99,6 +108,8 @@ export function useAnalytics({ service }: UseAnalyticsParams = {}): UseAnalytics
     iaasDistribution,
     conductaDistribution,
     monthlyCompliance,
+    cultivosPreRate,
+    avgTherapyDays,
     records,
     loading: recordsLoading,
     error: null,

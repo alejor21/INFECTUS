@@ -42,30 +42,20 @@ function isYes(value: string): boolean {
   return (value ?? '').trim().toUpperCase() === 'SI';
 }
 
+function pct(numerator: number, denominator: number): number {
+  if (denominator === 0) return 0;
+  return Math.round((numerator / denominator) * 10000) / 100;
+}
+
 // ---------------------------------------------------------------------------
 // KPI functions
 // ---------------------------------------------------------------------------
 
 /**
- * Average total therapy days per record, expressed as a percentage.
- * Formula: (sum of diasTerapiaMed01 + diasTerapiaMed02) / records.length * 100
- * Returns 0 if no records or invalid data
+ * Average therapy days across records with at least one therapy-day value.
  */
 export function calcAntibioticUseRate(records: InterventionRecord[]): number {
-  if (records.length === 0) return 0;
-  const totalDays = records.reduce((acc, r) => {
-    const d1 = parseFloat(r.diasTerapiaMed01) || 0;
-    const d2 = parseFloat(r.diasTerapiaMed02) || 0;
-    // Validate that parsed values are finite numbers
-    const days1 = Number.isFinite(d1) ? d1 : 0;
-    const days2 = Number.isFinite(d2) ? d2 : 0;
-    return acc + days1 + days2;
-  }, 0);
-  
-  if (!Number.isFinite(totalDays) || totalDays < 0) return 0;
-  
-  const rate = (totalDays / records.length) * 100;
-  return Number.isFinite(rate) ? Math.round(rate * 100) / 100 : 0;
+  return calcAvgTherapyDays(records);
 }
 
 /**
@@ -75,8 +65,7 @@ export function calcAntibioticUseRate(records: InterventionRecord[]): number {
 export function calcTherapeuticAdequacy(records: InterventionRecord[]): number {
   if (records.length === 0) return 0;
   const approved = records.filter((r) => isYes(r.aproboTerapia ?? '')).length;
-  const rate = (approved / records.length) * 100;
-  return Number.isFinite(rate) ? Math.round(rate * 100) / 100 : 0;
+  return pct(approved, records.length);
 }
 
 /**
@@ -99,8 +88,7 @@ export function calcIAASRate(
 export function calcGuidelineCompliance(records: InterventionRecord[]): number {
   if (records.length === 0) return 0;
   const compliant = records.filter((r) => isYes(r.terapiaEmpricaApropiada ?? '')).length;
-  const rate = (compliant / records.length) * 100;
-  return Number.isFinite(rate) ? Math.round(rate * 100) / 100 : 0;
+  return pct(compliant, records.length);
 }
 
 /**
@@ -234,7 +222,7 @@ export function calcMonthlyCompliance(
     .sort((a, b) => a[1].sortKey - b[1].sortKey)
     .map(([month, { compliant, total }]) => ({
       month,
-      rate: Math.round((compliant / total) * 10000) / 100,
+      rate: pct(compliant, total),
     }));
 }
 
@@ -245,8 +233,7 @@ export function calcMonthlyCompliance(
 export function calcCultivosPreRate(records: InterventionRecord[]): number {
   if (records.length === 0) return 0;
   const withCultivos = records.filter((r) => isYes(r.cultivosPrevios ?? '')).length;
-  const rate = (withCultivos / records.length) * 100;
-  return Number.isFinite(rate) ? Math.round(rate * 100) / 100 : 0;
+  return pct(withCultivos, records.length);
 }
 
 /**
@@ -384,7 +371,7 @@ export function calcMRSARate(records: InterventionRecord[]): number {
   const positives = positiveCultureRecords(records);
   if (positives.length === 0) return 0;
   const count = positives.filter((r) => isYes(r.mrsa ?? '')).length;
-  return Math.round((count / positives.length) * 10000) / 100;
+  return pct(count, positives.length);
 }
 
 /**
@@ -394,7 +381,7 @@ export function calcBLEERate(records: InterventionRecord[]): number {
   const positives = positiveCultureRecords(records);
   if (positives.length === 0) return 0;
   const count = positives.filter((r) => isYes(r.blee ?? '')).length;
-  return Math.round((count / positives.length) * 10000) / 100;
+  return pct(count, positives.length);
 }
 
 /**
@@ -404,7 +391,7 @@ export function calcCarbapenemaseRate(records: InterventionRecord[]): number {
   const positives = positiveCultureRecords(records);
   if (positives.length === 0) return 0;
   const count = positives.filter((r) => isYes(r.carbapenemasa ?? '')).length;
-  return Math.round((count / positives.length) * 10000) / 100;
+  return pct(count, positives.length);
 }
 
 /**
@@ -413,7 +400,7 @@ export function calcCarbapenemaseRate(records: InterventionRecord[]): number {
 export function calcPositiveCultureRate(records: InterventionRecord[]): number {
   if (records.length === 0) return 0;
   const count = positiveCultureRecords(records).length;
-  return Math.round((count / records.length) * 10000) / 100;
+  return pct(count, records.length);
 }
 
 /**
@@ -514,8 +501,8 @@ export function calcResistanceTrend(
     .sort((a, b) => a[1].sortKey - b[1].sortKey)
     .map(([month, { blee, mrsa, carba, total }]) => ({
       month,
-      blee: total > 0 ? Math.round((blee / total) * 10000) / 100 : 0,
-      mrsa: total > 0 ? Math.round((mrsa / total) * 10000) / 100 : 0,
-      carba: total > 0 ? Math.round((carba / total) * 10000) / 100 : 0,
+      blee: pct(blee, total),
+      mrsa: pct(mrsa, total),
+      carba: pct(carba, total),
     }));
 }

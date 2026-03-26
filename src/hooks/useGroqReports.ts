@@ -21,7 +21,7 @@ interface AnalyticsSnapshot {
 const SYSTEM_PROMPT = `Eres un experto en programas PROA (Programa de Optimización del Uso de Antimicrobianos) y control de infecciones hospitalarias.
 Respondes siempre en español, de forma clara, profesional y concisa.
 Cuando generes reportes, usa formato estructurado con secciones.
-Basa tus respuestas ÚNICAMENTE en los datos que te proporcionen, no inventes cifras.`;
+Basa tus respuestas únicamente en los datos que te proporcionen, no inventes cifras.`;
 
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
@@ -38,9 +38,9 @@ Período: ${snapshot.period}
 Total intervenciones: ${snapshot.totalRecords}
 Adecuación terapéutica: ${snapshot.therapeuticAdequacy.toFixed(1)}%
 Cumplimiento de guías: ${snapshot.guidelineCompliance.toFixed(1)}%
-Tasa de uso antibióticos: ${snapshot.antibioticUseRate.toFixed(1)} DDD/100 camas-día
+Días promedio de terapia: ${snapshot.antibioticUseRate.toFixed(1)} días
 Tasa IAAS: ${snapshot.iaasRate.toFixed(1)}%
-Top antibióticos: ${snapshot.top5Antibiotics.map((a) => `${a.name}(${a.count})`).join(', ')}
+Top antibióticos: ${snapshot.top5Antibiotics.map((item) => `${item.name}(${item.count})`).join(', ')}
 MRSA: ${snapshot.mrsaRate.toFixed(1)}%
 BLEE: ${snapshot.bleeRate.toFixed(1)}%
 Carbapenemasa: ${snapshot.carbapenemaseRate.toFixed(1)}%
@@ -50,13 +50,14 @@ Servicios activos: ${snapshot.topServices.join(', ')}
   const generateExecutiveReport = async (): Promise<string> => {
     setLoading(true);
     setError(null);
+
     try {
       return await askGroq(
         SYSTEM_PROMPT,
         `Genera un informe ejecutivo PROA completo basado en estos datos:\n${buildContext()}\n\nEl informe debe incluir: 1) Resumen ejecutivo, 2) Hallazgos principales, 3) Alertas y puntos críticos, 4) Recomendaciones prioritarias, 5) Conclusión.`,
       );
-    } catch (e: unknown) {
-      setError(getErrorMessage(e));
+    } catch (errorValue: unknown) {
+      setError(getErrorMessage(errorValue));
       return '';
     } finally {
       setLoading(false);
@@ -66,13 +67,14 @@ Servicios activos: ${snapshot.topServices.join(', ')}
   const generateAlerts = async (): Promise<string> => {
     setLoading(true);
     setError(null);
+
     try {
       return await askGroq(
         SYSTEM_PROMPT,
         `Analiza estos datos PROA y genera SOLO las alertas epidemiológicas y clínicas que requieren atención inmediata:\n${buildContext()}\n\nFormato: lista de alertas con nivel de prioridad (ALTA/MEDIA/BAJA) y acción recomendada.`,
       );
-    } catch (e: unknown) {
-      setError(getErrorMessage(e));
+    } catch (errorValue: unknown) {
+      setError(getErrorMessage(errorValue));
       return '';
     } finally {
       setLoading(false);
@@ -82,13 +84,14 @@ Servicios activos: ${snapshot.topServices.join(', ')}
   const chat = async (userQuestion: string): Promise<string> => {
     setLoading(true);
     setError(null);
+
     try {
       return await askGroq(
         SYSTEM_PROMPT,
         `Contexto de datos actuales:\n${buildContext()}\n\nPregunta del médico: ${userQuestion}`,
       );
-    } catch (e: unknown) {
-      setError(getErrorMessage(e));
+    } catch (errorValue: unknown) {
+      setError(getErrorMessage(errorValue));
       return '';
     } finally {
       setLoading(false);

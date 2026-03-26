@@ -17,82 +17,83 @@ const DATE_RANGE_LABEL: Record<'1m' | '6m' | '12m' | 'all', string> = {
 
 export function ConsumoAntibioticos() {
   const { selectedHospitalObj, hospitals, dateRange } = useHospitalContext();
-  const { kpis, monthlyConsumption, top5Antibiotics, records, loading } = useAnalytics();
+  const { kpis, monthlyConsumption, top5Antibiotics, records, loading, avgTherapyDays } = useAnalytics();
 
-  // Group records by servicio, summing DDD per service
   const consumptionByService = records
-    .reduce((acc, r) => {
-      const service = (r.servicio ?? '').trim();
+    .reduce((acc, record) => {
+      const service = (record.servicio ?? '').trim();
       if (!service) return acc;
-      const d1 = parseFloat(r.diasTerapiaMed01) || 0;
-      const d2 = parseFloat(r.diasTerapiaMed02) || 0;
-      const existing = acc.find((x) => x.service === service);
+
+      const days01 = parseFloat(record.diasTerapiaMed01) || 0;
+      const days02 = parseFloat(record.diasTerapiaMed02) || 0;
+      const existing = acc.find((item) => item.service === service);
+
       if (existing) {
-        existing.ddd += d1 + d2;
+        existing.ddd += days01 + days02;
       } else {
-        acc.push({ service, ddd: d1 + d2 });
+        acc.push({ service, ddd: days01 + days02 });
       }
+
       return acc;
     }, [] as { service: string; ddd: number }[])
-    .map((x) => ({ ...x, ddd: Math.round(x.ddd * 100) / 100 }))
+    .map((item) => ({ ...item, ddd: Math.round(item.ddd * 100) / 100 }))
     .sort((a, b) => b.ddd - a.ddd);
 
-  // Unique antibiotic and service counts
   const uniqueAntibiotics = new Set(
-    records.flatMap((r) => [r.antibiotico01, r.antibiotico02].filter((a) => (a ?? '').trim())),
+    records.flatMap((record) => [record.antibiotico01, record.antibiotico02].filter((value) => (value ?? '').trim())),
   ).size;
-  const uniqueServices = new Set(records.map((r) => (r.servicio ?? '').trim()).filter(Boolean)).size;
+  const uniqueServices = new Set(records.map((record) => (record.servicio ?? '').trim()).filter(Boolean)).size;
 
-  // Heatmap: antibiotic × service → total therapy days
   const heatmapData = (() => {
     const map = new Map<string, number>();
-    for (const r of records) {
-      const service = (r.servicio ?? '').trim();
-      const d1 = parseFloat(r.diasTerapiaMed01) || 0;
-      const d2 = parseFloat(r.diasTerapiaMed02) || 0;
-      for (const [ab, days] of [
-        [r.antibiotico01, d1],
-        [r.antibiotico02, d2],
+
+    for (const record of records) {
+      const service = (record.servicio ?? '').trim();
+      const days01 = parseFloat(record.diasTerapiaMed01) || 0;
+      const days02 = parseFloat(record.diasTerapiaMed02) || 0;
+
+      for (const [antibioticValue, days] of [
+        [record.antibiotico01, days01],
+        [record.antibiotico02, days02],
       ] as [string, number][]) {
-        const antibiotic = (ab ?? '').trim();
+        const antibiotic = (antibioticValue ?? '').trim();
+
         if (!antibiotic || !service || days === 0) continue;
+
         const key = `${antibiotic}||${service}`;
         map.set(key, (map.get(key) ?? 0) + days);
       }
     }
+
     return Array.from(map.entries()).map(([key, value]) => {
       const [antibiotic, service] = key.split('||');
       return { antibiotic, service, value: Math.round(value * 100) / 100 };
     });
   })();
 
-  const consumptionSparkline = monthlyConsumption.map((x) => x.ddd);
+  const consumptionSparkline = monthlyConsumption.map((item) => item.ddd);
 
   return (
     <div className={loading ? 'p-8 opacity-50' : 'p-8'}>
-      {/* Page title */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-1" style={{ color: '#0B3C5D' }}>
-          Consumo de Antibióticos
-        </h1>
+        <h1 className="mb-1 text-3xl font-bold text-slate-900 dark:text-white">Consumo de antibióticos</h1>
         {selectedHospitalObj ? (
-          <p className="text-sm font-medium text-gray-700">
+          <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
             {selectedHospitalObj.name} · {selectedHospitalObj.city}, {selectedHospitalObj.department}
           </p>
         ) : (
-          <p className="text-sm text-gray-600">
-            Vista general — Todos los hospitales ({hospitals.length} hospitales, {records.length} registros)
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Vista general · Todos los hospitales ({hospitals.length} hospitales, {records.length} registros)
           </p>
         )}
-        <p className="text-xs text-gray-400 mt-0.5">{DATE_RANGE_LABEL[dateRange]}</p>
+        <p className="mt-0.5 text-xs text-gray-400">{DATE_RANGE_LABEL[dateRange]}</p>
       </div>
 
-      {/* Quick stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
         <KPICard
-          title="Consumo total DDD"
-          value={String(kpis.antibioticUseRate)}
-          unit="DDD/100 camas-día"
+          title="Días promedio de terapia"
+          value={String(Math.round(avgTherapyDays * 10) / 10)}
+          unit="días"
           trend={-18.1}
           trendPositive={true}
           sparklineData={consumptionSparkline}
@@ -123,57 +124,54 @@ export function ConsumoAntibioticos() {
         />
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+      <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-3">
+        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
           <div className="flex items-center space-x-4">
-            <div className="w-12 h-12 rounded-lg flex items-center justify-center" style={{ backgroundColor: '#0F8B8D' }}>
-              <Pill className="w-6 h-6 text-white" />
+            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-teal-600">
+              <Pill className="h-6 w-6 text-white" />
             </div>
             <div>
-              <p className="text-sm text-gray-600 mb-1">Antibióticos diferentes</p>
-              <p className="text-2xl font-bold" style={{ color: '#0B3C5D' }}>{uniqueAntibiotics}</p>
+              <p className="mb-1 text-sm text-gray-600 dark:text-gray-400">Antibióticos diferentes</p>
+              <p className="text-2xl font-bold text-slate-900 dark:text-white">{uniqueAntibiotics}</p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
           <div className="flex items-center space-x-4">
-            <div className="w-12 h-12 rounded-lg flex items-center justify-center" style={{ backgroundColor: '#0B3C5D' }}>
-              <Building2 className="w-6 h-6 text-white" />
+            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-slate-900 dark:bg-slate-700">
+              <Building2 className="h-6 w-6 text-white" />
             </div>
             <div>
-              <p className="text-sm text-gray-600 mb-1">Servicios activos</p>
-              <p className="text-2xl font-bold" style={{ color: '#0B3C5D' }}>{uniqueServices}</p>
+              <p className="mb-1 text-sm text-gray-600 dark:text-gray-400">Servicios activos</p>
+              <p className="text-2xl font-bold text-slate-900 dark:text-white">{uniqueServices}</p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
           <div className="flex items-center space-x-4">
-            <div className="w-12 h-12 rounded-lg flex items-center justify-center bg-green-100">
-              <TrendingDown className="w-6 h-6 text-green-600" />
+            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-green-100 dark:bg-green-900/30">
+              <TrendingDown className="h-6 w-6 text-green-600 dark:text-green-400" />
             </div>
             <div>
-              <p className="text-sm text-gray-600 mb-1">Reducción vs 2025</p>
-              <p className="text-2xl font-bold text-green-600">-18.1%</p>
+              <p className="mb-1 text-sm text-gray-600 dark:text-gray-400">Reducción vs 2025</p>
+              <p className="text-2xl font-bold text-green-600 dark:text-green-400">-18.1%</p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        <ConsumptionTrendChart data={monthlyConsumption} />
-        <ConsumptionByServiceChart data={consumptionByService} />
+      <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <ConsumptionTrendChart data={monthlyConsumption} loading={loading} />
+        <ConsumptionByServiceChart data={consumptionByService} loading={loading} />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        <AntibioticFamilyChart data={top5Antibiotics.map((x) => ({ family: x.name, count: x.count }))} />
+      <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <AntibioticFamilyChart data={top5Antibiotics.map((item) => ({ family: item.name, count: item.count }))} />
         <ConsumptionHeatmap data={heatmapData} />
       </div>
 
-      {/* Detailed Table */}
       <DetailedConsumptionTable records={records} />
     </div>
   );
