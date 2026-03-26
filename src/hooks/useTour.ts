@@ -15,7 +15,7 @@ export const TOUR_STEPS: TourStep[] = [
     id: 'welcome',
     title: 'Bienvenido a INFECTUS',
     description:
-      'Esta guia te muestra por donde empezar para cargar informacion, revisar analiticas y dejar el hospital listo sin perder tiempo.',
+      'Esta guia te muestra por donde empezar para cargar informacion, revisar analiticas y dejar el hospital listo para el seguimiento clinico.',
     targetId: null,
     position: 'center',
   },
@@ -23,7 +23,7 @@ export const TOUR_STEPS: TourStep[] = [
     id: 'tour-dashboard',
     title: 'Dashboard',
     description:
-      'Aqui ves el resumen clinico del hospital: actividad reciente, nivel PROA, meses cargados y el siguiente paso recomendado.',
+      'Aqui ves el resumen clinico del hospital, la actividad reciente y el siguiente paso recomendado para el equipo PROA.',
     targetId: 'tour-dashboard',
     position: 'right',
   },
@@ -31,7 +31,7 @@ export const TOUR_STEPS: TourStep[] = [
     id: 'tour-hospitales',
     title: 'Hospitales',
     description:
-      'En esta seccion creas hospitales, subes el Excel PROA y revisas si la informacion del periodo quedo cargada correctamente.',
+      'En esta seccion creas hospitales, subes el Excel PROA y verificas si la informacion del periodo quedo cargada correctamente.',
     targetId: 'tour-hospitales',
     position: 'right',
   },
@@ -54,16 +54,14 @@ export const TOUR_STEPS: TourStep[] = [
   {
     id: 'tour-configuracion',
     title: 'Configuracion',
-    description:
-      'Desde aqui actualizas tu perfil, el hospital activo, usuarios y preferencias de uso.',
+    description: 'Desde aqui actualizas tu perfil, el hospital activo, usuarios y preferencias de uso.',
     targetId: 'tour-configuracion',
     position: 'right',
   },
   {
     id: 'tour-reportes',
     title: 'Reportes',
-    description:
-      'Exporta resumenes y documentos para comites clinicos, auditorias o seguimiento institucional.',
+    description: 'Exporta resumenes y documentos para comites clinicos, auditorias o seguimiento institucional.',
     targetId: 'tour-reportes',
     position: 'right',
   },

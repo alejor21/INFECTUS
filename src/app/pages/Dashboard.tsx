@@ -1,31 +1,29 @@
 import { useEffect, useState, type ComponentType } from 'react';
 import { useNavigate } from 'react-router';
 import {
-  ClipboardCheck,
-  Calendar,
-  Shield,
-  FileSpreadsheet,
-  Building2,
-  BarChart3,
   AlertTriangle,
-  Calculator,
-  FileText,
-  CheckCircle2,
+  BarChart3,
+  Building2,
+  Calendar,
   ChevronDown,
   ChevronUp,
-  TrendingUp,
+  ClipboardCheck,
+  FileSpreadsheet,
+  FileText,
   Plus,
+  Shield,
+  TrendingUp,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useHospitalContext } from '../../contexts/HospitalContext';
+import { useDashboardStats } from '../../hooks/useDashboardStats';
 import { EmptyState } from '../components/EmptyState';
 import { InfoTooltip } from '../components/Tooltip';
 import { WelcomeModal, shouldShowWelcome } from '../components/WelcomeModal';
-import { useDashboardStats } from '../../hooks/useDashboardStats';
 
 function getGreeting(name: string): string {
   const hour = new Date().getHours();
-  if (hour >= 5 && hour < 12) return `Buenos días, ${name}`;
+  if (hour >= 5 && hour < 12) return `Buenos dias, ${name}`;
   if (hour >= 12 && hour < 18) return `Buenas tardes, ${name}`;
   return `Buenas noches, ${name}`;
 }
@@ -34,7 +32,7 @@ function relativeDate(dateStr: string): string {
   const diffDays = Math.floor((Date.now() - new Date(dateStr).getTime()) / 86_400_000);
   if (diffDays <= 0) return 'Hoy';
   if (diffDays === 1) return 'Ayer';
-  if (diffDays < 7) return `Hace ${diffDays} días`;
+  if (diffDays < 7) return `Hace ${diffDays} dias`;
   if (diffDays < 30) return `Hace ${Math.floor(diffDays / 7)} semanas`;
   return `Hace ${Math.floor(diffDays / 30)} meses`;
 }
@@ -68,7 +66,7 @@ const LEVEL_BADGE: Record<string, { label: string; cls: string; iconCls: string 
     iconCls: 'text-green-500',
   },
   basico: {
-    label: 'Básico',
+    label: 'Basico',
     cls: 'text-yellow-600 dark:text-yellow-400',
     iconCls: 'text-yellow-500',
   },
@@ -92,36 +90,36 @@ const MODULE_CARDS: ModuleCard[] = [
     Icon: ClipboardCheck,
     iconCls: 'text-teal-500',
     bgCls: 'bg-teal-50 dark:bg-teal-900/20',
-    title: 'Evaluación PROA',
-    desc: 'Responde los criterios del programa, guarda borradores y obtén un nivel con recomendaciones automáticas.',
+    title: 'Evaluacion PROA',
+    desc: 'Registra cada intervencion, guarda borradores y sigue los casos que requieren respuesta clinica.',
   },
   {
     Icon: FileSpreadsheet,
     iconCls: 'text-emerald-500',
     bgCls: 'bg-emerald-50 dark:bg-emerald-900/20',
     title: 'Carga de Excel',
-    desc: 'Sube tus intervenciones y deja que Infectus detecte meses, servicios y métricas sin reprocesar manualmente.',
+    desc: 'Sube el archivo del periodo para generar metricas, tendencias y alertas sin digitacion manual.',
   },
   {
     Icon: BarChart3,
     iconCls: 'text-blue-500',
     bgCls: 'bg-blue-50 dark:bg-blue-900/20',
-    title: 'Analíticas',
-    desc: 'Consulta tendencias, cumplimiento y uso de antimicrobianos por periodo, servicio y tipo de intervención.',
+    title: 'Analiticas',
+    desc: 'Consulta tendencias, cumplimiento y uso de antimicrobianos por servicio, periodo y tipo de intervencion.',
   },
   {
     Icon: Shield,
     iconCls: 'text-violet-500',
     bgCls: 'bg-violet-50 dark:bg-violet-900/20',
     title: 'Indicadores PROA',
-    desc: 'Monitorea adherencia terapéutica, cultivos previos y otros indicadores clave del programa.',
+    desc: 'Monitorea adherencia terapeutica, cultivos previos y otros indicadores clave del programa.',
   },
   {
     Icon: FileText,
     iconCls: 'text-rose-500',
     bgCls: 'bg-rose-50 dark:bg-rose-900/20',
     title: 'Reportes',
-    desc: 'Exporta información lista para compartir con comités clínicos, dirección médica o auditorías internas.',
+    desc: 'Exporta informacion lista para comites clinicos, direccion medica o auditorias internas.',
   },
 ];
 
@@ -141,35 +139,37 @@ export function Dashboard() {
     }
   }, [profile?.id]);
 
-  const hasHospital = !!selectedHospitalObj;
-  const hasNoData = hasHospital && !dataLoading && !error && stats !== null && stats.evalCount === 0 && stats.excelMonths === 0;
+  const hasHospital = Boolean(selectedHospitalObj);
+  const hasNoData =
+    hasHospital && !dataLoading && !error && stats !== null && stats.evalCount === 0 && stats.excelMonths === 0;
   const firstName = profile?.full_name?.split(' ')[0] || 'Doctor';
   const level = stats?.proaLevel ?? null;
   const levelConf = level ? (LEVEL_BADGE[level] ?? null) : null;
+
   const recommendedAction: RecommendedAction = !hasHospital
     ? {
         title: 'Primero define tu hospital de trabajo',
-        description: 'Crea la institución o selecciona una existente para que el dashboard muestre datos clínicos reales.',
+        description: 'Crea la institucion o selecciona una existente para que el tablero muestre datos clinicos reales.',
         label: 'Ir a hospitales',
         onClick: () => navigate('/hospitales'),
       }
     : hasNoData
       ? {
-          title: 'Carga el Excel PROA del período',
-          description: 'Con el archivo mensual podrás obtener métricas automáticas, tendencias y alertas básicas sin digitación manual.',
+          title: 'Carga el Excel PROA del periodo',
+          description: 'Con el archivo mensual obtendras metricas automaticas, tendencias y alertas basicas sin digitacion manual.',
           label: 'Subir Excel',
           onClick: () => navigate('/hospitales'),
         }
       : {
-          title: 'Continúa el seguimiento clínico',
-          description: 'Revisa la actividad reciente o registra una nueva evaluación si hay intervenciones pendientes del día.',
-          label: 'Nueva evaluación',
+          title: 'Continua el seguimiento clinico',
+          description: 'Revisa la actividad reciente o registra una nueva evaluacion si hay intervenciones pendientes del dia.',
+          label: 'Nueva evaluacion',
           onClick: () => navigate('/evaluacion'),
         };
 
   return (
     <div className="mx-auto max-w-7xl space-y-8 px-4 py-8 sm:px-6">
-      {showWelcome && profile?.id && <WelcomeModal userId={profile.id} onDismiss={() => setShowWelcome(false)} />}
+      {showWelcome && profile?.id ? <WelcomeModal userId={profile.id} onDismiss={() => setShowWelcome(false)} /> : null}
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -181,34 +181,34 @@ export function Dashboard() {
           </div>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
             {selectedHospitalObj
-              ? `${selectedHospitalObj.name} · aquí está el resumen de hoy`
-              : 'Bienvenido a Infectus · selecciona un hospital para empezar'}
+              ? `${selectedHospitalObj.name} - resumen operativo de hoy`
+              : 'Bienvenido a Infectus. Selecciona un hospital para empezar.'}
           </p>
         </div>
 
-        {hasHospital && (
+        {hasHospital ? (
           <button
             onClick={() => navigate('/evaluacion')}
             className="inline-flex items-center gap-2 rounded-xl bg-teal-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-all duration-200 hover:bg-teal-700 hover:shadow-md"
           >
             <Plus className="h-4 w-4" />
-            Nueva evaluación
+            Nueva evaluacion
           </button>
-        )}
+        ) : null}
       </div>
 
-      {!hasHospital && (
+      {!hasHospital ? (
         <div className="rounded-2xl border border-dashed border-gray-300 bg-white dark:border-gray-700 dark:bg-gray-900">
           <EmptyState
             icon={Building2}
             title="Primero selecciona o crea un hospital para comenzar"
-            description="Necesitas un hospital activo para ver el resumen del dashboard y las métricas del programa."
+            description="Necesitas un hospital activo para ver el resumen del dashboard y las metricas del programa."
             action={{ label: 'Crear hospital', onClick: () => navigate('/hospitales') }}
           />
         </div>
-      )}
+      ) : null}
 
-      {hasHospital && error && (
+      {hasHospital && error ? (
         <div className="flex items-start justify-between gap-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 dark:border-red-900/40 dark:bg-red-950/30">
           <div className="flex items-start gap-3">
             <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-500" />
@@ -224,7 +224,7 @@ export function Dashboard() {
             Reintentar
           </button>
         </div>
-      )}
+      ) : null}
 
       <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -232,9 +232,7 @@ export function Dashboard() {
             <p className="text-xs font-semibold uppercase tracking-wide text-teal-600 dark:text-teal-300">
               Siguiente paso recomendado
             </p>
-            <h2 className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
-              {recommendedAction.title}
-            </h2>
+            <h2 className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">{recommendedAction.title}</h2>
             <p className="mt-1 max-w-3xl text-sm text-gray-500 dark:text-gray-400">
               {recommendedAction.description}
             </p>
@@ -254,12 +252,12 @@ export function Dashboard() {
             <ClipboardCheck className="h-5 w-5 text-teal-600" />
           </div>
           <p className={`text-3xl font-bold text-gray-900 dark:text-white ${dataLoading ? 'animate-pulse opacity-40' : ''}`}>
-            {dataLoading ? '—' : hasHospital ? String(stats?.evalCount ?? '—') : '—'}
+            {dataLoading ? '-' : hasHospital ? String(stats?.evalCount ?? '-') : '-'}
           </p>
           <p className="mt-1 text-sm font-medium text-gray-500 dark:text-gray-400">Evaluaciones registradas</p>
           <div className="mt-2 flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500">
             <TrendingUp className="h-3 w-3 text-emerald-500" />
-            <span className="text-emerald-600 dark:text-emerald-400">Seguimiento del período actual</span>
+            <span className="text-emerald-600 dark:text-emerald-400">Seguimiento del periodo actual</span>
           </div>
         </div>
 
@@ -268,16 +266,16 @@ export function Dashboard() {
             <Calendar className="h-5 w-5 text-blue-600" />
           </div>
           <p className={`text-xl font-bold leading-tight text-gray-900 dark:text-white ${dataLoading ? 'animate-pulse opacity-40' : ''}`}>
-            {dataLoading ? '—' : hasHospital ? (stats?.lastEval ? relativeDate(stats.lastEval.created_at) : 'Sin evaluaciones') : '—'}
+            {dataLoading ? '-' : hasHospital ? (stats?.lastEval ? relativeDate(stats.lastEval.created_at) : 'Sin evaluaciones') : '-'}
           </p>
-          <p className="mt-1 text-sm font-medium text-gray-500 dark:text-gray-400">Último registro</p>
-          {hasHospital && stats?.lastEval && (
+          <p className="mt-1 text-sm font-medium text-gray-500 dark:text-gray-400">Ultimo registro</p>
+          {hasHospital && stats?.lastEval ? (
             <div className="mt-2">
               <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_BADGE[stats.lastEval.status]?.cls ?? 'bg-gray-100 text-gray-600'}`}>
                 {STATUS_BADGE[stats.lastEval.status]?.label ?? stats.lastEval.status}
               </span>
             </div>
-          )}
+          ) : null}
         </div>
 
         <div className="rounded-2xl border border-gray-200 bg-white p-5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:border-gray-800 dark:bg-gray-900">
@@ -293,10 +291,10 @@ export function Dashboard() {
                   : 'text-gray-400 dark:text-gray-500'
             }`}
           >
-            {dataLoading ? '—' : hasHospital ? (levelConf ? levelConf.label : 'Sin datos') : '—'}
+            {dataLoading ? '-' : hasHospital ? (levelConf ? levelConf.label : 'Sin datos') : '-'}
           </p>
           <p className="mt-1 text-sm font-medium text-gray-500 dark:text-gray-400">Nivel PROA</p>
-          <p className="mt-2 text-xs text-gray-400 dark:text-gray-500">Según la evaluación más reciente</p>
+          <p className="mt-2 text-xs text-gray-400 dark:text-gray-500">Segun la evaluacion mas reciente</p>
         </div>
 
         <div className="rounded-2xl border border-gray-200 bg-white p-5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:border-gray-800 dark:bg-gray-900">
@@ -304,22 +302,22 @@ export function Dashboard() {
             <FileSpreadsheet className="h-5 w-5 text-emerald-600" />
           </div>
           <p className={`text-3xl font-bold text-gray-900 dark:text-white ${dataLoading ? 'animate-pulse opacity-40' : ''}`}>
-            {dataLoading ? '—' : hasHospital ? String(stats?.excelMonths ?? '—') : '—'}
+            {dataLoading ? '-' : hasHospital ? String(stats?.excelMonths ?? '-') : '-'}
           </p>
           <p className="mt-1 text-sm font-medium text-gray-500 dark:text-gray-400">Meses con Excel</p>
-          <p className="mt-2 text-xs text-gray-400 dark:text-gray-500">Fuente para analíticas automáticas</p>
+          <p className="mt-2 text-xs text-gray-400 dark:text-gray-500">Fuente para analiticas automaticas</p>
         </div>
       </div>
 
-      {hasNoData && (
+      {hasNoData ? (
         <div className="rounded-2xl border border-dashed border-gray-300 bg-white dark:border-gray-700 dark:bg-gray-900">
           <div className="px-6 py-12 text-center">
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800">
               <ClipboardCheck className="h-8 w-8 text-gray-400 dark:text-gray-500" />
             </div>
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Aún no tienes evaluaciones</h2>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Aun no tienes evaluaciones</h2>
             <p className="mx-auto mt-2 max-w-xl text-sm text-gray-500 dark:text-gray-400">
-              Sube un archivo Excel o crea una evaluación manual para empezar a ver el resumen del hospital.
+              Sube un archivo Excel o crea una evaluacion manual para empezar a ver el resumen del hospital.
             </p>
             <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
               <button
@@ -332,17 +330,17 @@ export function Dashboard() {
                 onClick={() => navigate('/evaluacion')}
                 className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 transition-all duration-200 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800"
               >
-                Crear evaluación manual
+                Crear evaluacion manual
               </button>
             </div>
           </div>
         </div>
-      )}
+      ) : null}
 
       <div>
         <h2 className="mb-2 text-xl font-semibold text-gray-900 dark:text-white">Tareas frecuentes</h2>
         <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
-          Accesos directos para las acciones que el equipo clínico usa con más frecuencia.
+          Accesos directos para las acciones que el equipo clinico usa con mas frecuencia.
         </p>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <button
@@ -352,8 +350,10 @@ export function Dashboard() {
             <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-teal-50 transition-transform duration-200 group-hover:scale-110 dark:bg-teal-900/30">
               <ClipboardCheck className="h-5 w-5 text-teal-600" />
             </div>
-            <p className="mb-1 text-sm font-semibold text-gray-900 dark:text-white">Nueva evaluación PROA</p>
-            <p className="text-xs leading-relaxed text-gray-500 dark:text-gray-400">Registra una intervención individual y continúa el seguimiento clínico.</p>
+            <p className="mb-1 text-sm font-semibold text-gray-900 dark:text-white">Nueva evaluacion PROA</p>
+            <p className="text-xs leading-relaxed text-gray-500 dark:text-gray-400">
+              Registra una intervencion individual y continua el seguimiento clinico.
+            </p>
           </button>
 
           <button
@@ -363,8 +363,10 @@ export function Dashboard() {
             <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 transition-transform duration-200 group-hover:scale-110 dark:bg-blue-900/30">
               <BarChart3 className="h-5 w-5 text-blue-600" />
             </div>
-            <p className="mb-1 text-sm font-semibold text-gray-900 dark:text-white">Ver analíticas</p>
-            <p className="text-xs leading-relaxed text-gray-500 dark:text-gray-400">Consulta indicadores, tendencias y comportamiento por servicio.</p>
+            <p className="mb-1 text-sm font-semibold text-gray-900 dark:text-white">Ver analiticas</p>
+            <p className="text-xs leading-relaxed text-gray-500 dark:text-gray-400">
+              Consulta indicadores, tendencias y comportamiento por servicio.
+            </p>
           </button>
 
           <button
@@ -375,7 +377,9 @@ export function Dashboard() {
               <Building2 className="h-5 w-5 text-violet-600" />
             </div>
             <p className="mb-1 text-sm font-semibold text-gray-900 dark:text-white">Gestionar hospitales</p>
-            <p className="text-xs leading-relaxed text-gray-500 dark:text-gray-400">Edita datos institucionales y carga archivos del programa.</p>
+            <p className="text-xs leading-relaxed text-gray-500 dark:text-gray-400">
+              Edita datos institucionales, cambia el hospital activo y carga archivos del programa.
+            </p>
           </button>
 
           <button
@@ -386,7 +390,9 @@ export function Dashboard() {
               <AlertTriangle className="h-5 w-5 text-amber-600" />
             </div>
             <p className="mb-1 text-sm font-semibold text-gray-900 dark:text-white">Registrar IAAS</p>
-            <p className="text-xs leading-relaxed text-gray-500 dark:text-gray-400">Documenta infecciones asociadas a la atención cuando requieras seguimiento adicional.</p>
+            <p className="text-xs leading-relaxed text-gray-500 dark:text-gray-400">
+              Documenta infecciones asociadas a la atencion cuando requieras seguimiento adicional.
+            </p>
           </button>
         </div>
       </div>
@@ -396,7 +402,7 @@ export function Dashboard() {
           onClick={() => setModulesOpen((value) => !value)}
           className="flex min-h-[44px] w-full items-center justify-between p-5 text-left transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/50"
         >
-          <h2 className="text-base font-semibold text-gray-900 dark:text-white">¿Cómo funciona Infectus?</h2>
+          <h2 className="text-base font-semibold text-gray-900 dark:text-white">Como usar Infectus en la practica diaria</h2>
           {modulesOpen ? (
             <ChevronUp className="h-5 w-5 shrink-0 text-gray-400" />
           ) : (
@@ -404,7 +410,7 @@ export function Dashboard() {
           )}
         </button>
 
-        {modulesOpen && (
+        {modulesOpen ? (
           <div className="border-t border-gray-100 px-5 pb-5 pt-4 dark:border-gray-800">
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {MODULE_CARDS.map((moduleCard) => (
@@ -420,10 +426,10 @@ export function Dashboard() {
               ))}
             </div>
           </div>
-        )}
+        ) : null}
       </div>
 
-      {hasHospital && !dataLoading && stats && (
+      {hasHospital && !dataLoading && stats ? (
         <div>
           <h2 className="mb-4 text-xl font-semibold text-gray-900 dark:text-white">Actividad reciente</h2>
 
@@ -433,10 +439,10 @@ export function Dashboard() {
                 <ClipboardCheck className="h-8 w-8 text-gray-400" />
               </div>
               <p className="mb-2 text-sm font-medium text-gray-600 dark:text-gray-400">No hay actividad reciente</p>
-              <p className="text-xs text-gray-400 dark:text-gray-500">Crea tu primera evaluación para comenzar.</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500">Crea tu primera evaluacion para comenzar.</p>
             </div>
           ) : (
-            <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white divide-y divide-gray-100 dark:border-gray-800 dark:bg-gray-900 dark:divide-gray-800">
+            <div className="divide-y divide-gray-100 overflow-hidden rounded-2xl border border-gray-200 bg-white dark:divide-gray-800 dark:border-gray-800 dark:bg-gray-900">
               {stats.recentEvals.map((evaluation) => {
                 const statusConf = STATUS_BADGE[evaluation.status] ?? {
                   label: evaluation.status,
@@ -454,10 +460,10 @@ export function Dashboard() {
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium text-gray-900 dark:text-white">
-                        Evaluación PROA
-                        {evaluation.hospital_name && (
-                          <span className="font-normal text-gray-500 dark:text-gray-400"> · {evaluation.hospital_name}</span>
-                        )}
+                        Evaluacion PROA
+                        {evaluation.hospital_name ? (
+                          <span className="font-normal text-gray-500 dark:text-gray-400"> - {evaluation.hospital_name}</span>
+                        ) : null}
                       </p>
                       <p className="text-xs text-gray-400 dark:text-gray-500">{relativeDate(evaluation.created_at)}</p>
                     </div>
@@ -465,9 +471,9 @@ export function Dashboard() {
                       <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${statusConf.cls}`}>
                         {statusConf.label}
                       </span>
-                      {evaluation.progress_pct != null && (
+                      {evaluation.progress_pct != null ? (
                         <span className="text-xs text-gray-400 dark:text-gray-500">{evaluation.progress_pct}%</span>
-                      )}
+                      ) : null}
                     </div>
                   </button>
                 );
@@ -475,7 +481,7 @@ export function Dashboard() {
             </div>
           )}
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
