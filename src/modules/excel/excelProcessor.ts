@@ -1,5 +1,7 @@
 import * as XLSX from 'xlsx';
 import { getSupabaseClient } from '../../lib/supabase/client';
+import { parseInterventionFile } from '../../lib/parsers/excelParser';
+import { upsertInterventions } from '../../lib/supabase/queries/interventions';
 
 // ─── Month name lookup tables ──────────────────────────────────────────────
 
@@ -242,6 +244,47 @@ export async function processAndSaveExcel(
   uploadedBy: string,
 ): Promise<ProcessResult> {
   try {
+    const parsedInterventions = await parseInterventionFile(file);
+    if (parsedInterventions.valid.length === 0) {
+      return {
+        success: false,
+        monthsFound: [],
+        totalRows: 0,
+        error: parsedInterventions.errors[0]?.message ?? 'Sin registros validos para cargar.',
+      };
+    }
+
+    const supabase = getSupabaseClient();
+    const { data: hospitalRow, error: hospitalError } = await supabase
+      .from('hospitals')
+      .select('name')
+      .eq('id', hospitalId)
+      .single();
+
+    if (hospitalError || !hospitalRow?.name) {
+      return {
+        success: false,
+        monthsFound: [],
+        totalRows: 0,
+        error: hospitalError?.message ?? 'No se pudo identificar el hospital para cargar el Excel.',
+      };
+    }
+
+    const recordsWithHospital = parsedInterventions.valid.map((record) => ({
+      ...record,
+      hospitalName: hospitalRow.name,
+    }));
+
+    const { inserted, error: interventionsError } = await upsertInterventions(recordsWithHospital);
+    if (interventionsError) {
+      return {
+        success: false,
+        monthsFound: [],
+        totalRows: 0,
+        error: interventionsError,
+      };
+    }
+
     const buffer = await file.arrayBuffer();
     const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
 
@@ -331,8 +374,6 @@ export async function processAndSaveExcel(
     monthsFound.sort();
 
     // ── Persist to Supabase ───────────────────────────────────────────────
-    const supabase = getSupabaseClient();
-
     const latestMonth = monthlyData[monthlyData.length - 1] ?? null;
     const latestMonthParts = latestMonth?.month.split('-') ?? [];
     const latestYear = latestMonthParts.length === 2 ? Number(latestMonthParts[0]) : null;
@@ -350,10 +391,10 @@ export async function processAndSaveExcel(
         mes: latestMonthNumber,
         anio: latestYear,
         total_filas: totalRows,
-        filas_validas: totalRows,
-        filas_error: 0,
+        filas_validas: inserted,
+        filas_error: parsedInterventions.summary.errorRows,
         estado: 'completado',
-        errores: [],
+        errores: parsedInterventions.errors,
       })
       .select('id')
       .single();
@@ -376,6 +417,10 @@ export async function processAndSaveExcel(
           },
           { onConflict: 'hospital_id,month' },
         );
+    }
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('infectus:data-updated'));
     }
 
     return { success: true, monthsFound, totalRows };
