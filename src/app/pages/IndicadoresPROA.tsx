@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertCircle,
   BarChart3,
@@ -16,7 +16,9 @@ import {
   getServicioAnalysis,
   getTipoIntervencionAnalysis,
 } from '../../lib/analytics/proaCommittee';
-import { exportAllChartsAsPNG, exportChartAsPNG, exportChartsPDF } from '../../utils/exportCharts';
+import { exportAllChartsAsPNG, exportChartAsPNG } from '../../utils/exportCharts';
+import { exportPDF } from '../../utils/exportPDF';
+import { generateProaReport, type ReportComparisonRow } from '../../utils/generateProaReport';
 import { useHospitalContext } from '../../contexts/HospitalContext';
 import { EmptyState } from '../components/EmptyState';
 import { IndicatorCard } from '../components/IndicatorCard';
@@ -35,6 +37,7 @@ export function IndicadoresPROA() {
   const [compareMes, setCompareMes] = useState<number | null>(null);
   const [compareAnio, setCompareAnio] = useState<number | null>(null);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const chartsSectionRef = useRef<HTMLDivElement | null>(null);
   const { data, mesesDisponibles, loading, error, refetch } = useAnalyticsData(
     selectedHospitalObj?.id,
     selectedMes,
@@ -91,34 +94,42 @@ export function IndicadoresPROA() {
     () => getTipoIntervencionAnalysis(dataCompare?.tipoData ?? []),
     [dataCompare?.tipoData],
   );
+  const comparisonTable = useMemo<ReportComparisonRow[] | undefined>(() => {
+    if (!data || !dataCompare) {
+      return undefined;
+    }
 
-  const committeePdfData = useMemo(
-    () => ({
-      charts: [
-        {
-          id: 'proa-chart-tipo-intervencion',
-          title: 'Tipo de Intervenciones PROA',
-          analysis: tipoAnalysis,
-        },
-        {
-          id: 'proa-chart-servicio',
-          title: 'Intervenciones por Servicio',
-          analysis: servicioAnalysis,
-        },
-        {
-          id: 'proa-chart-conductas',
-          title: 'Conductas de Infectologia por Servicio',
-          analysis: conductasAnalysis,
-        },
-        {
-          id: 'proa-chart-adherencia',
-          title: 'Adherencia a las Intervenciones',
-          analysis: adherenciaAnalysis,
-        },
-      ],
-    }),
-    [adherenciaAnalysis, conductasAnalysis, servicioAnalysis, tipoAnalysis],
-  );
+    return [
+      {
+        indicador: 'Total evaluaciones',
+        mes1: String(data.totalEvaluaciones),
+        mes2: String(dataCompare.totalEvaluaciones),
+        diff: `${data.totalEvaluaciones - dataCompare.totalEvaluaciones >= 0 ? '+' : ''}${data.totalEvaluaciones - dataCompare.totalEvaluaciones}`,
+        positivo: data.totalEvaluaciones - dataCompare.totalEvaluaciones > 0,
+      },
+      {
+        indicador: '% Aprobacion',
+        mes1: `${data.pctAprobacion}%`,
+        mes2: `${dataCompare.pctAprobacion}%`,
+        diff: `${data.pctAprobacion - dataCompare.pctAprobacion >= 0 ? '+' : ''}${(data.pctAprobacion - dataCompare.pctAprobacion).toFixed(1)}%`,
+        positivo: data.pctAprobacion - dataCompare.pctAprobacion > 0,
+      },
+      {
+        indicador: '% Cultivos previos',
+        mes1: `${data.pctCultivos}%`,
+        mes2: `${dataCompare.pctCultivos}%`,
+        diff: `${data.pctCultivos - dataCompare.pctCultivos >= 0 ? '+' : ''}${(data.pctCultivos - dataCompare.pctCultivos).toFixed(1)}%`,
+        positivo: data.pctCultivos - dataCompare.pctCultivos > 0,
+      },
+      {
+        indicador: '% Terapia empirica',
+        mes1: `${data.pctEmpirica}%`,
+        mes2: `${dataCompare.pctEmpirica}%`,
+        diff: `${data.pctEmpirica - dataCompare.pctEmpirica >= 0 ? '+' : ''}${(data.pctEmpirica - dataCompare.pctEmpirica).toFixed(1)}%`,
+        positivo: data.pctEmpirica - dataCompare.pctEmpirica > 0,
+      },
+    ];
+  }, [data, dataCompare]);
 
   async function handleIndividualExport(elementId: string, chartLabel: string) {
     const hospitalName = selectedHospitalObj?.name ?? 'Hospital';
@@ -133,9 +144,39 @@ export function IndicadoresPROA() {
   }
 
   async function handleExportPdf() {
+    if (!data) {
+      return;
+    }
+
     const hospitalName = selectedHospitalObj?.name ?? 'Hospital';
     const periodLabel = data?.periodoLabel ?? 'Todos los datos';
-    await exportChartsPDF(hospitalName, periodLabel, committeePdfData);
+    const reporteTextoIA = await generateProaReport({
+      hospitalNombre: hospitalName,
+      mes: periodLabel,
+      totalEvaluaciones: data.totalEvaluaciones,
+      tipoAnalisis: tipoAnalysis,
+      servicioAnalisis: servicioAnalysis,
+      conductaAnalisis: conductasAnalysis,
+      adherenciaAnalisis: adherenciaAnalysis,
+      mesComparar: dataCompare?.periodoLabel,
+      tablaComparativa: comparisonTable,
+    });
+
+    await exportPDF({
+      hospitalNombre: hospitalName,
+      mes: periodLabel,
+      totalEvaluaciones: data.totalEvaluaciones,
+      reporteTextoIA,
+      mesComparar: dataCompare?.periodoLabel,
+      tablaComparativa: comparisonTable,
+      rootElement: chartsSectionRef.current,
+      kpis: [
+        { label: 'Evaluaciones', value: String(data.totalEvaluaciones) },
+        { label: 'Aprobacion', value: `${data.pctAprobacion}%` },
+        { label: 'Cultivos previos', value: `${data.pctCultivos}%` },
+        { label: 'Terapia empirica', value: `${data.pctEmpirica}%` },
+      ],
+    });
   }
 
   if (hospitalsLoading || loading) {
@@ -212,7 +253,14 @@ export function IndicadoresPROA() {
         isOpen={isReportModalOpen}
         onClose={() => setIsReportModalOpen(false)}
         initialHospitalId={selectedHospitalObj.id}
+        initialMonth={
+          selectedMes !== null && selectedAnio !== null
+            ? `${selectedAnio}-${String(selectedMes).padStart(2, '0')}`
+            : undefined
+        }
         initialScope="hospital"
+        mesComparar={dataCompare?.periodoLabel}
+        tablaComparativa={comparisonTable}
       />
 
       <div className="mb-8">
@@ -336,51 +384,59 @@ export function IndicadoresPROA() {
         </div>
       </div>
 
-      <div className="mb-8 grid grid-cols-1 gap-6 xl:grid-cols-2">
-        <TipoIntervencionCommitteeChart
-          cardId="proa-chart-tipo-intervencion"
-          title="Tipo de Intervenciones PROA"
-          subtitle={chartSubtitle}
-          data={data.tipoData}
-          analysis={tipoAnalysis}
-          isLoading={loading}
-          onExport={() => {
-            void handleIndividualExport('proa-chart-tipo-intervencion', 'TipoIntervencion');
-          }}
-        />
-        <DistribucionServicioChart
-          cardId="proa-chart-servicio"
-          title="Intervenciones por Servicio"
-          subtitle={chartSubtitle}
-          data={data.servicioData}
-          analysis={servicioAnalysis}
-          isLoading={loading}
-          onExport={() => {
-            void handleIndividualExport('proa-chart-servicio', 'PorServicio');
-          }}
-        />
-        <ConductasChart
-          cardId="proa-chart-conductas"
-          title="Conductas de Infectologia por Servicio"
-          subtitle={chartSubtitle}
-          data={data.conductasData}
-          analysis={conductasAnalysis}
-          isLoading={loading}
-          onExport={() => {
-            void handleIndividualExport('proa-chart-conductas', 'Conductas');
-          }}
-        />
-        <AdherenciaChart
-          cardId="proa-chart-adherencia"
-          title="Adherencia a las Intervenciones"
-          subtitle={chartSubtitle}
-          data={data.adherenciaData}
-          analysis={adherenciaAnalysis}
-          isLoading={loading}
-          onExport={() => {
-            void handleIndividualExport('proa-chart-adherencia', 'Adherencia');
-          }}
-        />
+      <div ref={chartsSectionRef} className="mb-8 grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <div data-chart="tipo-intervencion">
+          <TipoIntervencionCommitteeChart
+            cardId="proa-chart-tipo-intervencion"
+            title="Tipo de Intervenciones PROA"
+            subtitle={chartSubtitle}
+            data={data.tipoData}
+            analysis={tipoAnalysis}
+            isLoading={loading}
+            onExport={() => {
+              void handleIndividualExport('proa-chart-tipo-intervencion', 'TipoIntervencion');
+            }}
+          />
+        </div>
+        <div data-chart="por-servicio">
+          <DistribucionServicioChart
+            cardId="proa-chart-servicio"
+            title="Intervenciones por Servicio"
+            subtitle={chartSubtitle}
+            data={data.servicioData}
+            analysis={servicioAnalysis}
+            isLoading={loading}
+            onExport={() => {
+              void handleIndividualExport('proa-chart-servicio', 'PorServicio');
+            }}
+          />
+        </div>
+        <div data-chart="conductas">
+          <ConductasChart
+            cardId="proa-chart-conductas"
+            title="Conductas de Infectologia por Servicio"
+            subtitle={chartSubtitle}
+            data={data.conductasData}
+            analysis={conductasAnalysis}
+            isLoading={loading}
+            onExport={() => {
+              void handleIndividualExport('proa-chart-conductas', 'Conductas');
+            }}
+          />
+        </div>
+        <div data-chart="adherencia">
+          <AdherenciaChart
+            cardId="proa-chart-adherencia"
+            title="Adherencia a las Intervenciones"
+            subtitle={chartSubtitle}
+            data={data.adherenciaData}
+            analysis={adherenciaAnalysis}
+            isLoading={loading}
+            onExport={() => {
+              void handleIndividualExport('proa-chart-adherencia', 'Adherencia');
+            }}
+          />
+        </div>
       </div>
 
       {compareMes !== null && dataCompare ? (
