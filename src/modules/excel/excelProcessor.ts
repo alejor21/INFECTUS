@@ -76,9 +76,25 @@ const MESES_LABEL = [
 
 const COLUMN_MAP: Record<string, string[]> = {
   fecha: ['fecha', 'date', 'fecha_intervencion', 'fecha_valoracion', 'fecha_de_intervencion'],
-  tipo_intervencion: ['tipo_intervencion', 'tipo', 'tipo_de_intervencion', 'intervencion'],
+  tipo_intervencion: [
+    'tipo_intervencion',
+    'tipo',
+    'tipo_de_intervencion',
+    'intervencion',
+    'tipo_de_intervencion_ic',
+    'tipo_de_intervencion_ic_proa',
+  ],
   nombre_paciente: ['nombre_paciente', 'nombre', 'paciente', 'nombre_del_paciente'],
-  cedula: ['cedula', 'id', 'documento', 'identificacion', 'admision', 'no_admision', 'admision_cedula'],
+  cedula: [
+    'cedula',
+    'id',
+    'documento',
+    'identificacion',
+    'admision',
+    'no_admision',
+    'admisioncedula',
+    'admision_cedula',
+  ],
   cama: ['cama', 'cama_no', 'numero_cama', 'no_cama'],
   servicio: ['servicio', 'area', 'unidad', 'servicio_medico'],
   edad: ['edad', 'age', 'anos', 'a_os'],
@@ -86,15 +102,64 @@ const COLUMN_MAP: Record<string, string[]> = {
   diagnostico: ['diagnostico', 'diagnosis', 'diagnostico_principal', 'impresion_diagnostica'],
   iaas: ['iaas', 'infeccion_asociada', 'infeccion_hospitalaria', 'iaas_si_no'],
   tipo_iaas: ['tipo_iaas', 'tipo_infeccion', 'tipo_de_iaas'],
-  aprobacion_terapia: ['aprobacion_terapia', 'aprobacion', 'se_aprobo', 'aprobado', 'adherencia', 'aprobacion_de_terapia', 'aprobo_terapia'],
-  causa_no_aprobacion: ['causa_no_aprobacion', 'causa_no_aprobado', 'razon_no_aprobacion'],
+  aprobacion_terapia: [
+    'aprobacion_terapia',
+    'aprobacion',
+    'se_aprobo',
+    'aprobado',
+    'adherencia',
+    'aprobacion_de_terapia',
+    'aprobo_terapia',
+    'se_aprobo_terapia',
+    'se_aprobo_terapia_antimicrobiana',
+  ],
+  causa_no_aprobacion: [
+    'causa_no_aprobacion',
+    'causa_no_aprobado',
+    'razon_no_aprobacion',
+    'si_no_se_aprobo',
+    'si_no_se_aprobo_causa',
+  ],
   combinacion_no_adecuada: ['combinacion_no_adecuada', 'combinacion_inadecuada'],
   extension_no_adecuada: ['extension_no_adecuada', 'extension_inadecuada'],
-  ajuste_cultivo: ['ajuste_cultivo', 'ajuste_por_cultivo', 'cultivo_ajuste'],
-  dx_correlacionado: ['dx_correlacionado', 'diagnostico_correlacionado', 'correlacion', 'correlacion_dx_antibiotico'],
-  terapia_empirica: ['terapia_empirica', 'empirica', 'tratamiento_empirico', 'terapia_empirica_apropiada'],
-  cultivos_previos: ['cultivos_previos', 'cultivo_previo', 'tiene_cultivos'],
-  conducta_general: ['conducta_general', 'conducta', 'recomendacion', 'accion', 'conducta_infectologia'],
+  ajuste_cultivo: [
+    'ajuste_cultivo',
+    'ajuste_por_cultivo',
+    'cultivo_ajuste',
+    'se_realizo_ajuste',
+    'ajuste_de_terapia_antimicrobiana',
+  ],
+  dx_correlacionado: [
+    'dx_correlacionado',
+    'diagnostico_correlacionado',
+    'correlacion',
+    'correlacion_dx_antibiotico',
+    'diagnostico_infeccioso_correlacionado',
+    'correlacionado_con_terapia',
+  ],
+  terapia_empirica: [
+    'terapia_empirica',
+    'empirica',
+    'tratamiento_empirico',
+    'terapia_empirica_apropiada',
+    'la_terapia_empirica',
+    'terapia_empirica_fue',
+  ],
+  cultivos_previos: [
+    'cultivos_previos',
+    'cultivo_previo',
+    'tiene_cultivos',
+    'toma_de_cultivos',
+    'se_realizo_toma_de_cultivos',
+  ],
+  conducta_general: [
+    'conducta_general',
+    'conducta',
+    'recomendacion',
+    'accion',
+    'conducta_infectologia',
+    'conducta_general_cambio',
+  ],
   antibiotico_01: ['antibiotico_01', 'antibiotico1', 'antibiotico_1', 'antibiotico', 'atb1'],
   acciones_medicamento_01: ['acciones_medicamento_01', 'accion_01', 'accion1', 'accion_atb_1', 'acciones_med_01'],
   dias_terapia_01: ['dias_terapia_01', 'dias1', 'dias_01', 'dias_tratamiento_1', 'dias_terapia_med_01'],
@@ -241,9 +306,17 @@ function buildColumnIndex(headers: unknown[]): Record<string, number> {
   const index: Record<string, number> = {};
 
   for (const [dbColumn, synonyms] of Object.entries(COLUMN_MAP)) {
-    for (const synonym of synonyms) {
-      const position = normalizedHeaders.indexOf(synonym);
-      if (position !== -1) {
+    for (let position = 0; position < normalizedHeaders.length; position += 1) {
+      const header = normalizedHeaders[position];
+      const matches = synonyms.some((synonym) =>
+        header === synonym
+        || header.startsWith(`${synonym}_`)
+        || header.startsWith(synonym)
+        || header.includes(`_${synonym}_`)
+        || header.includes(`_${synonym}`),
+      );
+
+      if (matches) {
         index[dbColumn] = position;
         break;
       }
@@ -378,11 +451,15 @@ function normalizeConducta(value: unknown): string | null {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '');
 
-  if (normalized.includes('acort') || normalized.includes('reduc')) return 'Acortar días de tto';
   if (normalized.includes('desescal')) return 'Desescalonamiento';
+  if (normalized.includes('escalon') && !normalized.includes('desescal')) return 'Escalona';
+  if (normalized.includes('dirige')) return 'Dirige terapia';
+  if (normalized.includes('mantien') || normalized.includes('mantener')) return 'Mantiene';
+  if (normalized.includes('oral') || normalized.includes('cambio')) return 'Cambio a oral';
+  if (normalized.includes('acort') || normalized.includes('reduc')) return 'Acortar días de tto';
   if (normalized.includes('suspens') || normalized.includes('suspend')) return 'Suspensión';
-  if (normalized.includes('ajuste') || normalized.includes('dosis')) return 'Ajuste de dosis';
-  if (normalized.includes('continu') || normalized.includes('mantener')) return 'Continuar esquema';
+  if (normalized.includes('ajuste') && normalized.includes('dosis')) return 'Ajuste de dosis';
+  if (normalized.includes('continu')) return 'Continuar esquema';
 
   return cleaned;
 }
