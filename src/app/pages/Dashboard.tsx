@@ -145,7 +145,7 @@ export function Dashboard() {
   const navigate = useNavigate();
   const { profile } = useAuth();
   const { allRawRecords, hospitalsLoading, selectedHospitalObj } = useHospitalContext();
-  const { stats, loading: dataLoading, error, refresh } = useDashboardStats(selectedHospitalObj?.id ?? null);
+  const { stats, loading: dataLoading, error, refetch } = useDashboardStats(selectedHospitalObj?.id ?? null);
 
   const [modulesOpen, setModulesOpen] = useState(false);
   const [showWelcome, setShowWelcome] = useState(false);
@@ -218,7 +218,7 @@ export function Dashboard() {
           <span className="text-5xl">⚠️</span>
           <p className="text-sm text-red-500">{error}</p>
           <button
-            onClick={() => void refresh()}
+            onClick={() => void refetch()}
             className="rounded-lg bg-teal-600 px-4 py-2 text-sm text-white transition-all duration-200 hover:bg-teal-700"
           >
             Reintentar
@@ -244,7 +244,9 @@ export function Dashboard() {
                 <InfoTooltip content="Resumen general de las evaluaciones del mes actual" />
               </div>
               <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                {selectedHospitalObj ? `${selectedHospitalObj.name} - período ${stats?.periodoLabel ?? 'Todos los datos'}` : ''}
+                {selectedHospitalObj
+                  ? `${selectedHospitalObj.name} - ${stats?.periodoLabel ?? 'Todos los datos'} - ${stats?.totalEvaluaciones ?? 0} evaluaciones`
+                  : ''}
               </p>
             </div>
 
@@ -267,7 +269,7 @@ export function Dashboard() {
                 </div>
               </div>
               <button
-                onClick={() => void refresh()}
+                onClick={() => void refetch()}
                 className="rounded-lg border border-red-200 bg-white px-3 py-1.5 text-sm font-medium text-red-700 transition-colors hover:bg-red-100 dark:border-red-800 dark:bg-red-950/20 dark:text-red-300 dark:hover:bg-red-900/40"
               >
                 Reintentar
