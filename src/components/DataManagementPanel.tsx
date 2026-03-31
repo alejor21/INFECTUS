@@ -101,23 +101,6 @@ export function DataManagementPanel({ hospitalId, hospitalName }: DataManagement
               Reintentar
             </button>
           </div>
-        ) : meses.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-8 text-center dark:border-gray-700 dark:bg-gray-950/40">
-            <Upload className="mx-auto h-10 w-10 text-gray-300 dark:text-gray-600" />
-            <h3 className="mt-4 text-lg font-semibold text-gray-900 dark:text-white">Aun no tienes datos cargados</h3>
-            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-              {hospitalName
-                ? `No hay evaluaciones registradas para ${hospitalName}.`
-                : 'No hay evaluaciones registradas para el hospital activo.'}
-            </p>
-            <button
-              type="button"
-              onClick={() => navigate('/hospitales')}
-              className="mt-4 inline-flex min-h-[44px] items-center justify-center rounded-xl bg-teal-600 px-4 py-2 text-sm font-medium text-white transition-all duration-200 hover:bg-teal-700"
-            >
-              Subir nuevo Excel
-            </button>
-          </div>
         ) : (
           <div className="space-y-6">
             {invalidCount > 0 ? (
@@ -143,30 +126,49 @@ export function DataManagementPanel({ hospitalId, hospitalName }: DataManagement
               </div>
             ) : null}
 
-            <div>
-              <p className="mb-3 text-sm font-medium text-gray-700 dark:text-gray-300">Datos por mes</p>
-              <div className="overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-800">
-                {meses.map((mesData) => (
-                  <div
-                    key={mesData.value}
-                    className="flex flex-col gap-3 border-b border-gray-200 px-4 py-3 transition-colors duration-200 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-800/50 sm:flex-row sm:items-center sm:justify-between"
-                  >
-                    <div>
-                      <p className="text-sm font-medium text-gray-900 dark:text-white">{mesData.label}</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">{mesData.count} evaluaciones</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setDeleteTarget({ type: 'mes', mesData })}
-                      className="inline-flex min-h-[40px] items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-red-600 transition-all duration-200 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/30"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      Eliminar mes
-                    </button>
-                  </div>
-                ))}
+            {meses.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-8 text-center dark:border-gray-700 dark:bg-gray-950/40">
+                <Upload className="mx-auto h-10 w-10 text-gray-300 dark:text-gray-600" />
+                <h3 className="mt-4 text-lg font-semibold text-gray-900 dark:text-white">Aun no tienes datos cargados</h3>
+                <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                  {hospitalName
+                    ? `No hay evaluaciones registradas para ${hospitalName}.`
+                    : 'No hay evaluaciones registradas para el hospital activo.'}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => navigate('/hospitales')}
+                  className="mt-4 inline-flex min-h-[44px] items-center justify-center rounded-xl bg-teal-600 px-4 py-2 text-sm font-medium text-white transition-all duration-200 hover:bg-teal-700"
+                >
+                  Subir nuevo Excel
+                </button>
               </div>
-            </div>
+            ) : (
+              <div>
+                <p className="mb-3 text-sm font-medium text-gray-700 dark:text-gray-300">Datos por mes</p>
+                <div className="overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-800">
+                  {meses.map((mesData) => (
+                    <div
+                      key={mesData.value}
+                      className="flex flex-col gap-3 border-b border-gray-200 px-4 py-3 transition-colors duration-200 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-800/50 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div>
+                        <p className="text-sm font-medium text-gray-900 dark:text-white">{mesData.label}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{mesData.count} evaluaciones</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setDeleteTarget({ type: 'mes', mesData })}
+                        className="inline-flex min-h-[40px] items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-red-600 transition-all duration-200 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/30"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        Eliminar mes
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="rounded-2xl border border-red-200 bg-red-50/70 p-4 dark:border-red-900/40 dark:bg-red-950/20">
               <div className="flex items-start gap-3">
