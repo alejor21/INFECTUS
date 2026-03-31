@@ -362,6 +362,10 @@ function parseDate(value: unknown): Date | null {
     return null;
   }
 
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value;
+  }
+
   if (typeof value === 'number' && value > 1000 && value < 100000) {
     return new Date(Math.round((value - 25569) * 86400 * 1000));
   }
@@ -389,6 +393,47 @@ function parseDate(value: unknown): Date | null {
 
   const fallback = new Date(raw);
   return Number.isNaN(fallback.getTime()) ? null : fallback;
+}
+
+function parseFecha(fechaRaw: unknown): { mes: number; anio: number } | null {
+  if (!fechaRaw) {
+    return null;
+  }
+
+  const stringValue = String(fechaRaw).trim();
+  const dayMonthYear = stringValue.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (dayMonthYear) {
+    return {
+      mes: Number.parseInt(dayMonthYear[2], 10),
+      anio: Number.parseInt(dayMonthYear[3], 10),
+    };
+  }
+
+  const yearMonthDay = stringValue.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (yearMonthDay) {
+    return {
+      mes: Number.parseInt(yearMonthDay[2], 10),
+      anio: Number.parseInt(yearMonthDay[1], 10),
+    };
+  }
+
+  const serial = Number.parseFloat(stringValue);
+  if (!Number.isNaN(serial) && serial > 40000 && serial < 60000) {
+    const date = new Date((serial - 25569) * 86400 * 1000);
+    return {
+      mes: date.getUTCMonth() + 1,
+      anio: date.getUTCFullYear(),
+    };
+  }
+
+  if (fechaRaw instanceof Date) {
+    return {
+      mes: fechaRaw.getMonth() + 1,
+      anio: fechaRaw.getFullYear(),
+    };
+  }
+
+  return null;
 }
 
 function parseBool(value: unknown): boolean | null {
@@ -536,9 +581,9 @@ function parseSheetNameToYearMonth(name: string): { year: number; month: number 
 }
 
 function parseDateToYearMonth(value: unknown): { year: number; month: number } | null {
-  const parsed = parseDate(value);
-  if (parsed) {
-    return { year: parsed.getFullYear(), month: parsed.getMonth() + 1 };
+  const parsedFecha = parseFecha(value);
+  if (parsedFecha) {
+    return { year: parsedFecha.anio, month: parsedFecha.mes };
   }
 
   const cleaned = cleanString(value);
@@ -692,7 +737,6 @@ function buildEvaluationRows(
   const headers = rows[0] as unknown[];
   const dataRows = rows.slice(1);
   const columnIndex = buildColumnIndex(headers);
-  const fallbackMonth = inferirMesDeNombreArchivo(filename);
   const errores: RowError[] = [];
   const parsedRows: ParsedEvaluationRow[] = [];
   const monthCount = new Map<string, number>();
@@ -710,13 +754,16 @@ function buildEvaluationRows(
     };
 
     const sourceRowNumber = index + 2;
-    const parsedDate = parseDate(getValue('fecha'));
-    const mes = parsedDate ? parsedDate.getMonth() + 1 : fallbackMonth?.mes ?? null;
-    const anio = parsedDate ? parsedDate.getFullYear() : fallbackMonth?.anio ?? null;
+    const fechaRaw = getValue('fecha');
+    const fechaParsed = parseFecha(fechaRaw);
 
-    if (!mes || !anio) {
+    if (!fechaParsed) {
       errores.push({ fila: sourceRowNumber, motivo: 'No se pudo determinar mes/fecha' });
+      continue;
     }
+
+    const { mes, anio } = fechaParsed;
+    const parsedDate = parseDate(fechaRaw);
 
     const isoDate = parsedDate ? toIsoDate(parsedDate) : null;
     const evaluationDate = isoDate ?? toIsoDate(new Date());
@@ -931,9 +978,9 @@ export async function processAndSaveExcel(
     }
 
     const buffer = await file.arrayBuffer();
-    const workbook = XLSX.read(buffer, { type: 'array', cellDates: false });
+    const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
     const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-    const rawRows = XLSX.utils.sheet_to_json(firstSheet, { header: 1, defval: null }) as unknown[][];
+    const rawRows = XLSX.utils.sheet_to_json(firstSheet, { header: 1, defval: null, raw: false }) as unknown[][];
 
     if (rawRows.length < 2) {
       return {
@@ -988,11 +1035,11 @@ export async function processAndSaveExcel(
           }
 
           const monthKey = `${entry.parsed.year}-${String(entry.parsed.month).padStart(2, '0')}`;
-          const sheetRows = XLSX.utils.sheet_to_json(workbook.Sheets[entry.name], { defval: null }) as Record<string, unknown>[];
+          const sheetRows = XLSX.utils.sheet_to_json(workbook.Sheets[entry.name], { defval: null, raw: false }) as Record<string, unknown>[];
           inferredMonthlyDataMap.set(monthKey, sheetRows);
         }
       } else {
-        const allRows = XLSX.utils.sheet_to_json(firstSheet, { defval: null }) as Record<string, unknown>[];
+        const allRows = XLSX.utils.sheet_to_json(firstSheet, { defval: null, raw: false }) as Record<string, unknown>[];
         if (allRows.length > 0) {
           const dateColumn = Object.keys(allRows[0]).find((column) => /^(mes|month|fecha|date|periodo|per[ií]odo)$/i.test(column.trim()));
           if (dateColumn) {
