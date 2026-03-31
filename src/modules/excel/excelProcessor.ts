@@ -555,7 +555,12 @@ function inferirMesDeNombreArchivo(filename: string): { mes: number; anio: numbe
   return null;
 }
 
-function parseSheetNameToYearMonth(name: string): { year: number; month: number } | null {
+function extractYearFromValue(value: string): number | null {
+  const yearMatch = value.match(/20\d{2}/);
+  return yearMatch ? Number.parseInt(yearMatch[0], 10) : null;
+}
+
+function parseSheetNameToYearMonth(name: string, fallbackYear?: number | null): { year: number; month: number } | null {
   const normalized = name.trim();
   const isoMatch = /^(\d{4})-(\d{2})$/.exec(normalized);
   if (isoMatch) {
@@ -565,7 +570,7 @@ function parseSheetNameToYearMonth(name: string): { year: number; month: number 
   const lowered = normalized.toLowerCase();
   const words = lowered.split(/[\s\-_/]+/);
   let monthNumber: number | undefined;
-  let year = new Date().getFullYear();
+  let year = fallbackYear ?? extractYearFromValue(normalized) ?? new Date().getFullYear();
 
   for (const word of words) {
     if (SPANISH_MONTHS[word] !== undefined) {
@@ -714,7 +719,7 @@ function calculateMetrics(rows: Record<string, unknown>[]): MonthMetrics {
 }
 
 function buildEvaluationRows(
-  rows: unknown[][],
+  workbook: XLSX.WorkBook,
   hospitalId: string,
   hospitalName: string,
   filename: string,
@@ -725,7 +730,7 @@ function buildEvaluationRows(
   mesesDetectados: DetectedMonth[];
   monthlyDataMap: Map<string, Record<string, unknown>[]>;
 } {
-  if (rows.length < 2) {
+  if (workbook.SheetNames.length === 0) {
     return {
       parsedRows: [],
       errores: [{ fila: 1, motivo: 'El archivo está vacío o sin datos' }],
@@ -734,120 +739,141 @@ function buildEvaluationRows(
     };
   }
 
-  const headers = rows[0] as unknown[];
-  const dataRows = rows.slice(1);
-  const columnIndex = buildColumnIndex(headers);
+  const fallbackYear = extractYearFromValue(filename);
   const errores: RowError[] = [];
   const parsedRows: ParsedEvaluationRow[] = [];
   const monthCount = new Map<string, number>();
   const monthlyDataMap = new Map<string, Record<string, unknown>[]>();
+  let hasDataRows = false;
 
-  for (let index = 0; index < dataRows.length; index += 1) {
-    const row = dataRows[index];
-    if (!row.some((cell) => cell !== null && cell !== '' && cell !== undefined)) {
+  for (const sheetName of workbook.SheetNames) {
+    const sheet = workbook.Sheets[sheetName];
+    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null, raw: false }) as unknown[][];
+    if (rows.length < 2) {
       continue;
     }
 
-    const getValue = (column: string): unknown => {
-      const position = columnIndex[column];
-      return position !== undefined ? row[position] : null;
-    };
+    hasDataRows = true;
+    const headers = rows[0] as unknown[];
+    const dataRows = rows.slice(1);
+    const columnIndex = buildColumnIndex(headers);
+    const sheetYearMonth = parseSheetNameToYearMonth(sheetName, fallbackYear);
 
-    const sourceRowNumber = index + 2;
-    const fechaRaw = getValue('fecha');
-    const fechaParsed = parseFecha(fechaRaw);
+    for (let index = 0; index < dataRows.length; index += 1) {
+      const row = dataRows[index];
+      if (!row.some((cell) => cell !== null && cell !== '' && cell !== undefined)) {
+        continue;
+      }
 
-    if (!fechaParsed) {
-      errores.push({ fila: sourceRowNumber, motivo: 'No se pudo determinar mes/fecha' });
-      continue;
-    }
+      const getValue = (column: string): unknown => {
+        const position = columnIndex[column];
+        return position !== undefined ? row[position] : null;
+      };
 
-    const { mes, anio } = fechaParsed;
-    const parsedDate = parseDate(fechaRaw);
+      const sourceRowNumber = index + 2;
+      const fechaRaw = getValue('fecha');
+      const fechaParsed = parseFecha(fechaRaw);
+      const mes = fechaParsed?.mes ?? sheetYearMonth?.month ?? null;
+      const anio = fechaParsed?.anio ?? sheetYearMonth?.year ?? null;
 
-    const isoDate = parsedDate ? toIsoDate(parsedDate) : null;
-    const evaluationDate = isoDate ?? toIsoDate(new Date());
+      if (!mes || !anio) {
+        errores.push({ fila: sourceRowNumber, motivo: 'No se pudo determinar mes/fecha' });
+        continue;
+      }
 
-    const payload: EvaluationInsertRow = {
-      hospital_id: hospitalId,
-      hospital_name: hospitalName,
-      created_by: uploadedBy,
-      status: 'completada',
-      evaluation_date: evaluationDate,
-      fecha: isoDate,
-      mes,
-      anio,
-      tipo_intervencion: normalizeTipoIntervencion(getValue('tipo_intervencion')),
-      nombre_paciente: cleanString(getValue('nombre_paciente')),
-      cedula: cleanString(getValue('cedula')),
-      cama: cleanString(getValue('cama')),
-      servicio: cleanString(getValue('servicio')),
-      edad: parseInteger(getValue('edad')),
-      cod_diagnostico: cleanString(getValue('cod_diagnostico')),
-      diagnostico: cleanString(getValue('diagnostico')),
-      iaas: parseBool(getValue('iaas')),
-      tipo_iaas: cleanString(getValue('tipo_iaas')),
-      aprobacion_terapia: parseBool(getValue('aprobacion_terapia')),
-      causa_no_aprobacion: cleanString(getValue('causa_no_aprobacion')),
-      combinacion_no_adecuada: parseBool(getValue('combinacion_no_adecuada')),
-      extension_no_adecuada: parseBool(getValue('extension_no_adecuada')),
-      ajuste_cultivo: parseBool(getValue('ajuste_cultivo')),
-      dx_correlacionado: parseBool(getValue('dx_correlacionado')),
-      terapia_empirica: parseBool(getValue('terapia_empirica')),
-      cultivos_previos: parseBool(getValue('cultivos_previos')),
-      conducta_general: normalizeConducta(getValue('conducta_general')),
-      antibiotico_01: cleanString(getValue('antibiotico_01')),
-      acciones_medicamento_01: cleanString(getValue('acciones_medicamento_01')),
-      dias_terapia_01: parseInteger(getValue('dias_terapia_01')),
-      antibiotico_02: cleanString(getValue('antibiotico_02')),
-      acciones_medicamento_02: cleanString(getValue('acciones_medicamento_02')),
-      dias_terapia_02: parseInteger(getValue('dias_terapia_02')),
-      observaciones: cleanString(getValue('observaciones')),
-    };
+      const parsedDate = parseDate(fechaRaw);
+      const isoDate = parsedDate ? toIsoDate(parsedDate) : null;
+      const evaluationDate = isoDate ?? toIsoDate(new Date(anio, mes - 1, 1));
 
-    parsedRows.push({
-      sourceRowNumber,
-      payload,
-      analyticsRow: {
-        fecha: payload.fecha,
-        tipo_intervencion: payload.tipo_intervencion,
-        nombre_paciente: payload.nombre_paciente,
-        cedula: payload.cedula,
-        cama: payload.cama,
-        servicio: payload.servicio,
-        edad: payload.edad,
-        cod_diagnostico: payload.cod_diagnostico,
-        diagnostico: payload.diagnostico,
-        iaas: payload.iaas,
-        tipo_iaas: payload.tipo_iaas,
-        aprobacion_terapia: payload.aprobacion_terapia,
-        causa_no_aprobacion: payload.causa_no_aprobacion,
-        combinacion_no_adecuada: payload.combinacion_no_adecuada,
-        extension_no_adecuada: payload.extension_no_adecuada,
-        ajuste_cultivo: payload.ajuste_cultivo,
-        dx_correlacionado: payload.dx_correlacionado,
-        terapia_empirica: payload.terapia_empirica,
-        cultivos_previos: payload.cultivos_previos,
-        conducta_general: payload.conducta_general,
-        antibiotico_01: payload.antibiotico_01,
-        acciones_medicamento_01: payload.acciones_medicamento_01,
-        dias_terapia_01: payload.dias_terapia_01,
-        antibiotico_02: payload.antibiotico_02,
-        acciones_medicamento_02: payload.acciones_medicamento_02,
-        dias_terapia_02: payload.dias_terapia_02,
-        observaciones: payload.observaciones,
-        mes: payload.mes,
-        anio: payload.anio,
-      },
-    });
+      const payload: EvaluationInsertRow = {
+        hospital_id: hospitalId,
+        hospital_name: hospitalName,
+        created_by: uploadedBy,
+        status: 'completada',
+        evaluation_date: evaluationDate,
+        fecha: isoDate,
+        mes,
+        anio,
+        tipo_intervencion: normalizeTipoIntervencion(getValue('tipo_intervencion')),
+        nombre_paciente: cleanString(getValue('nombre_paciente')),
+        cedula: cleanString(getValue('cedula')),
+        cama: cleanString(getValue('cama')),
+        servicio: cleanString(getValue('servicio')),
+        edad: parseInteger(getValue('edad')),
+        cod_diagnostico: cleanString(getValue('cod_diagnostico')),
+        diagnostico: cleanString(getValue('diagnostico')),
+        iaas: parseBool(getValue('iaas')),
+        tipo_iaas: cleanString(getValue('tipo_iaas')),
+        aprobacion_terapia: parseBool(getValue('aprobacion_terapia')),
+        causa_no_aprobacion: cleanString(getValue('causa_no_aprobacion')),
+        combinacion_no_adecuada: parseBool(getValue('combinacion_no_adecuada')),
+        extension_no_adecuada: parseBool(getValue('extension_no_adecuada')),
+        ajuste_cultivo: parseBool(getValue('ajuste_cultivo')),
+        dx_correlacionado: parseBool(getValue('dx_correlacionado')),
+        terapia_empirica: parseBool(getValue('terapia_empirica')),
+        cultivos_previos: parseBool(getValue('cultivos_previos')),
+        conducta_general: normalizeConducta(getValue('conducta_general')),
+        antibiotico_01: cleanString(getValue('antibiotico_01')),
+        acciones_medicamento_01: cleanString(getValue('acciones_medicamento_01')),
+        dias_terapia_01: parseInteger(getValue('dias_terapia_01')),
+        antibiotico_02: cleanString(getValue('antibiotico_02')),
+        acciones_medicamento_02: cleanString(getValue('acciones_medicamento_02')),
+        dias_terapia_02: parseInteger(getValue('dias_terapia_02')),
+        observaciones: cleanString(getValue('observaciones')),
+      };
 
-    if (mes && anio) {
+      parsedRows.push({
+        sourceRowNumber,
+        payload,
+        analyticsRow: {
+          fecha: payload.fecha,
+          tipo_intervencion: payload.tipo_intervencion,
+          nombre_paciente: payload.nombre_paciente,
+          cedula: payload.cedula,
+          cama: payload.cama,
+          servicio: payload.servicio,
+          edad: payload.edad,
+          cod_diagnostico: payload.cod_diagnostico,
+          diagnostico: payload.diagnostico,
+          iaas: payload.iaas,
+          tipo_iaas: payload.tipo_iaas,
+          aprobacion_terapia: payload.aprobacion_terapia,
+          causa_no_aprobacion: payload.causa_no_aprobacion,
+          combinacion_no_adecuada: payload.combinacion_no_adecuada,
+          extension_no_adecuada: payload.extension_no_adecuada,
+          ajuste_cultivo: payload.ajuste_cultivo,
+          dx_correlacionado: payload.dx_correlacionado,
+          terapia_empirica: payload.terapia_empirica,
+          cultivos_previos: payload.cultivos_previos,
+          conducta_general: payload.conducta_general,
+          antibiotico_01: payload.antibiotico_01,
+          acciones_medicamento_01: payload.acciones_medicamento_01,
+          dias_terapia_01: payload.dias_terapia_01,
+          antibiotico_02: payload.antibiotico_02,
+          acciones_medicamento_02: payload.acciones_medicamento_02,
+          dias_terapia_02: payload.dias_terapia_02,
+          observaciones: payload.observaciones,
+          mes: payload.mes,
+          anio: payload.anio,
+        },
+      });
+
       const key = `${anio}-${mes}`;
       monthCount.set(key, (monthCount.get(key) ?? 0) + 1);
-      const existingRows = monthlyDataMap.get(`${anio}-${String(mes).padStart(2, '0')}`) ?? [];
+      const monthKey = `${anio}-${String(mes).padStart(2, '0')}`;
+      const existingRows = monthlyDataMap.get(monthKey) ?? [];
       existingRows.push(parsedRows[parsedRows.length - 1].analyticsRow);
-      monthlyDataMap.set(`${anio}-${String(mes).padStart(2, '0')}`, existingRows);
+      monthlyDataMap.set(monthKey, existingRows);
     }
+  }
+
+  if (!hasDataRows) {
+    return {
+      parsedRows: [],
+      errores: [{ fila: 1, motivo: 'El archivo estÃ¡ vacÃ­o o sin datos' }],
+      mesesDetectados: [],
+      monthlyDataMap: new Map<string, Record<string, unknown>[]>(),
+    };
   }
 
   const mesesDetectados = Array.from(monthCount.entries())
@@ -979,10 +1005,8 @@ export async function processAndSaveExcel(
 
     const buffer = await file.arrayBuffer();
     const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
-    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-    const rawRows = XLSX.utils.sheet_to_json(firstSheet, { header: 1, defval: null, raw: false }) as unknown[][];
 
-    if (rawRows.length < 2) {
+    if (workbook.SheetNames.length === 0) {
       return {
         success: false,
         monthsFound: [],
@@ -996,8 +1020,9 @@ export async function processAndSaveExcel(
       };
     }
 
+    const fallbackYear = extractYearFromValue(file.name);
     const { parsedRows, errores: parsingErrors, mesesDetectados, monthlyDataMap } = buildEvaluationRows(
-      rawRows,
+      workbook,
       hospitalId,
       hospitalRow.name,
       file.name,
@@ -1025,7 +1050,7 @@ export async function processAndSaveExcel(
     const inferredMonthlyDataMap = new Map<string, Record<string, unknown>[]>();
     if (monthlyDataMap.size === 0) {
       const sheetCandidates = workbook.SheetNames
-        .map((name) => ({ name, parsed: parseSheetNameToYearMonth(name) }))
+        .map((name) => ({ name, parsed: parseSheetNameToYearMonth(name, fallbackYear) }))
         .filter((entry) => entry.parsed !== null);
 
       if (sheetCandidates.length > 0) {
@@ -1039,11 +1064,17 @@ export async function processAndSaveExcel(
           inferredMonthlyDataMap.set(monthKey, sheetRows);
         }
       } else {
-        const allRows = XLSX.utils.sheet_to_json(firstSheet, { defval: null, raw: false }) as Record<string, unknown>[];
-        if (allRows.length > 0) {
-          const dateColumn = Object.keys(allRows[0]).find((column) => /^(mes|month|fecha|date|periodo|per[ií]odo)$/i.test(column.trim()));
-          if (dateColumn) {
-            for (const row of allRows) {
+        for (const sheetName of workbook.SheetNames) {
+          const sheetRows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { defval: null, raw: false }) as Record<string, unknown>[];
+          if (sheetRows.length === 0) {
+            continue;
+          }
+          const dateColumn = Object.keys(sheetRows[0]).find((column) => /^(mes|month|fecha|date|periodo|per[ií]odo)$/i.test(column.trim()));
+          if (!dateColumn) {
+            continue;
+          }
+
+          for (const row of sheetRows) {
               const yearMonth = parseDateToYearMonth(row[dateColumn]);
               if (!yearMonth) {
                 continue;
@@ -1057,7 +1088,6 @@ export async function processAndSaveExcel(
           }
         }
       }
-    }
 
     const metricsSource = monthlyDataMap.size > 0 ? monthlyDataMap : inferredMonthlyDataMap;
     const monthlyData: Array<{ month: string; monthLabel: string; metrics: MonthMetrics; rowCount: number }> = [];
