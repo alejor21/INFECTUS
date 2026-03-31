@@ -15,13 +15,13 @@ import { useNavigate } from 'react-router';
 import { useHospitalContext } from '../../contexts/HospitalContext';
 import { useAuth, usePermissions } from '../../contexts/AuthContext';
 import {
-  createHospital,
   updateHospital,
   deleteHospital,
   saveHospitalFile,
   deleteHospitalFileData,
 } from '../../lib/supabase/hospitals';
 import type { Hospital, HospitalFile } from '../../lib/supabase/hospitals';
+import { getSupabaseClient } from '../../lib/supabase/client';
 import { parseInterventionFile } from '../../lib/parsers/excelParser';
 import { upsertInterventions } from '../../lib/supabase/queries/interventions';
 import { toast } from 'sonner';
@@ -139,6 +139,8 @@ export function Hospitales() {
     hospitals,
     setSelectedHospitalObj,
     refreshHospitals,
+    hospitalsLoading,
+    hospitalsError,
     dateRange,
     setDateRange,
   } = useHospitalContext();
@@ -258,6 +260,11 @@ export function Hospitales() {
   };
 
   const handleAddHospital = async () => {
+    if (!user?.id) {
+      setAddError('Debes iniciar sesion para crear hospitales.');
+      return;
+    }
+
     const validationError = validateHospitalForm({
       name: addName,
       city: addCity,
@@ -275,15 +282,20 @@ export function Hospitales() {
     setAddError('');
 
     try {
-      const { data: newHospital, error } = await createHospital({
-        name: addName.trim(),
-        city: addCity.trim(),
-        department: addDept.trim(),
-        beds: addBeds ? parseInt(addBeds, 10) : null,
-        contact_name: addContactName.trim() || null,
-        contact_email: addContactEmail.trim().toLowerCase() || null,
-        is_active: true,
-      });
+      const { data: newHospital, error } = await getSupabaseClient()
+        .from('hospitals')
+        .insert({
+          name: addName.trim(),
+          city: addCity.trim(),
+          department: addDept.trim(),
+          beds: addBeds ? parseInt(addBeds, 10) : null,
+          contact_name: addContactName.trim() || null,
+          contact_email: addContactEmail.trim().toLowerCase() || null,
+          is_active: true,
+          user_id: user.id,
+        })
+        .select('*')
+        .single();
 
       if (error) {
         setAddError(error.message);
@@ -714,11 +726,47 @@ export function Hospitales() {
         )}
 
         {/* Hospital cards grid */}
-        {hospitals.length === 0 ? (
+        {hospitalsLoading ? (
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 3 }).map((_, index) => (
+              <div
+                key={`hospital-skeleton-${index}`}
+                className="animate-pulse rounded-xl border border-gray-200 bg-white p-6 shadow-sm"
+              >
+                <div className="mb-4 h-5 w-2/3 rounded bg-gray-200" />
+                <div className="mb-6 h-4 w-1/2 rounded bg-gray-100" />
+                <div className="mb-3 h-4 w-full rounded bg-gray-100" />
+                <div className="mb-3 h-4 w-5/6 rounded bg-gray-100" />
+                <div className="mt-6 flex gap-2">
+                  <div className="h-10 w-24 rounded-lg bg-gray-100" />
+                  <div className="h-10 w-24 rounded-lg bg-gray-100" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : hospitalsError ? (
+          <div className="rounded-2xl border border-red-200 bg-white p-6 shadow-sm">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div>
+                <p className="text-base font-semibold text-red-700">No se pudieron cargar tus hospitales</p>
+                <p className="mt-1 text-sm text-red-600">{hospitalsError}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  void refreshHospitals();
+                }}
+                className="inline-flex min-h-[44px] items-center justify-center rounded-lg border border-red-200 px-4 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-50"
+              >
+                Reintentar
+              </button>
+            </div>
+          </div>
+        ) : hospitals.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-gray-300 bg-white dark:border-gray-700 dark:bg-gray-900">
             <EmptyState
               icon={Building2}
-              title="Aún no has creado ningún hospital"
+              title="Aún no tienes hospitales registrados"
               description="Crea tu primer hospital para empezar a cargar archivos y registrar evaluaciones PROA."
               action={canCreate ? { label: 'Crear mi primer hospital', onClick: () => setShowAddForm(true) } : undefined}
             />

@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { useAuth } from './AuthContext';
 import type { Hospital, HospitalFile } from '../lib/supabase/hospitals';
 import { getHospitals, getHospitalFiles } from '../lib/supabase/hospitals';
 import { getInterventionsByDateRange } from '../lib/supabase/queries/interventions';
@@ -24,6 +25,8 @@ interface HospitalContextValue {
 
   // Loading state for records fetch
   recordsLoading: boolean;
+  hospitalsLoading: boolean;
+  hospitalsError: string | null;
 
   // Refresh helpers
   refreshHospitals: () => Promise<void>;
@@ -69,6 +72,8 @@ export const HospitalContext = createContext<HospitalContextValue>({
   records: [],
   hospitalFiles: [],
   recordsLoading: false,
+  hospitalsLoading: false,
+  hospitalsError: null,
   refreshHospitals: async () => {},
   refreshFiles: async () => {},
   refreshRecords: async () => {},
@@ -81,12 +86,15 @@ export function useHospitalContext() {
 }
 
 export function HospitalProvider({ children }: { children: React.ReactNode }) {
+  const { user, loading: authLoading } = useAuth();
   const [hospitals, setHospitals] = useState<Hospital[]>([]);
   const [selectedHospitalObj, setSelectedHospitalObjState] = useState<Hospital | null>(null);
   const [hospitalFiles, setHospitalFiles] = useState<HospitalFile[]>([]);
   const [dateRange, setDateRange] = useState<'1m' | '6m' | '12m' | 'all'>('6m');
   const [allRawRecords, setAllRawRecords] = useState<InterventionRecord[]>([]);
   const [recordsLoading, setRecordsLoading] = useState(false);
+  const [hospitalsLoading, setHospitalsLoading] = useState(false);
+  const [hospitalsError, setHospitalsError] = useState<string | null>(null);
 
   // Derived string — keeps legacy consumers (e.g. Dashboard patient table) working
   const selectedHospital = selectedHospitalObj?.name ?? '';
@@ -116,9 +124,34 @@ export function HospitalProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const refreshHospitals = useCallback(async () => {
-    const data = await getHospitals();
-    setHospitals(data);
-  }, []);
+    if (authLoading) {
+      return;
+    }
+
+    if (!user) {
+      setHospitals([]);
+      setHospitalFiles([]);
+      setSelectedHospitalObjState(null);
+      setHospitalsError(null);
+      setHospitalsLoading(false);
+      return;
+    }
+
+    setHospitalsLoading(true);
+    setHospitalsError(null);
+
+    try {
+      const data = await getHospitals();
+      setHospitals(data);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'No se pudieron cargar tus hospitales.';
+      setHospitals([]);
+      setSelectedHospitalObjState(null);
+      setHospitalsError(message);
+    } finally {
+      setHospitalsLoading(false);
+    }
+  }, [authLoading, user]);
 
   const refreshFiles = useCallback(async () => {
     if (!selectedHospitalObj) {
@@ -130,6 +163,16 @@ export function HospitalProvider({ children }: { children: React.ReactNode }) {
   }, [selectedHospitalObj]);
 
   const refreshRecords = useCallback(async () => {
+    if (authLoading) {
+      return;
+    }
+
+    if (!user) {
+      setAllRawRecords([]);
+      setRecordsLoading(false);
+      return;
+    }
+
     setRecordsLoading(true);
     try {
       const now = new Date();
@@ -139,25 +182,37 @@ export function HospitalProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setRecordsLoading(false);
     }
-  }, []);
+  }, [authLoading, user]);
 
-  // Load hospitals on mount (refreshHospitals is stable via useCallback with empty deps)
   useEffect(() => {
     let isMounted = true;
     refreshHospitals().then(() => {
       if (!isMounted) return;
     });
     return () => { isMounted = false; };
-  }, [refreshHospitals]);
+  }, [refreshHospitals, user?.id, authLoading]);
 
-  // Load all records on mount (refreshRecords is stable via useCallback with empty deps)
   useEffect(() => {
     let isMounted = true;
     refreshRecords().then(() => {
       if (!isMounted) return;
     });
     return () => { isMounted = false; };
-  }, [refreshRecords]);
+  }, [refreshRecords, user?.id, authLoading]);
+
+  useEffect(() => {
+    if (hospitals.length === 1) {
+      const onlyHospital = hospitals[0];
+      if (selectedHospitalObj?.id !== onlyHospital.id) {
+        setSelectedHospitalObjState(onlyHospital);
+      }
+      return;
+    }
+
+    if (selectedHospitalObj && !hospitals.some((hospital) => hospital.id === selectedHospitalObj.id)) {
+      setSelectedHospitalObjState(null);
+    }
+  }, [hospitals, selectedHospitalObj]);
 
   // Reset dateRange when selected hospital changes
   useEffect(() => {
@@ -196,6 +251,8 @@ export function HospitalProvider({ children }: { children: React.ReactNode }) {
         records,
         hospitalFiles,
         recordsLoading,
+        hospitalsLoading,
+        hospitalsError,
         refreshHospitals,
         refreshFiles,
         refreshRecords,
