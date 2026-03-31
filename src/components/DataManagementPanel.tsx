@@ -12,6 +12,7 @@ interface DataManagementPanelProps {
 
 type DeleteTarget =
   | { type: 'mes'; mesData: MesData }
+  | { type: 'invalid'; invalidCount: number }
   | { type: 'all'; totalEvaluaciones: number; totalMeses: number };
 
 function buildSummary(totalEvaluaciones: number, totalMeses: number): string {
@@ -22,7 +23,17 @@ function buildSummary(totalEvaluaciones: number, totalMeses: number): string {
 
 export function DataManagementPanel({ hospitalId, hospitalName }: DataManagementPanelProps) {
   const navigate = useNavigate();
-  const { meses, totalEvaluaciones, loading, error, deleteMes, deleteAllData, refetch } = useDataManagement(hospitalId);
+  const {
+    meses,
+    totalEvaluaciones,
+    invalidCount,
+    loading,
+    error,
+    deleteMes,
+    deleteAllData,
+    deleteInvalidData,
+    refetch,
+  } = useDataManagement(hospitalId);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
 
   const summary = useMemo(() => buildSummary(totalEvaluaciones, meses.length), [meses.length, totalEvaluaciones]);
@@ -35,6 +46,12 @@ export function DataManagementPanel({ hospitalId, hospitalName }: DataManagement
     if (deleteTarget.type === 'mes') {
       await deleteMes(deleteTarget.mesData.mes, deleteTarget.mesData.anio);
       toast.success(`${deleteTarget.mesData.count} evaluaciones eliminadas correctamente`);
+      return;
+    }
+
+    if (deleteTarget.type === 'invalid') {
+      await deleteInvalidData();
+      toast.success(`${deleteTarget.invalidCount} evaluaciones incompletas eliminadas correctamente`);
       return;
     }
 
@@ -103,6 +120,29 @@ export function DataManagementPanel({ hospitalId, hospitalName }: DataManagement
           </div>
         ) : (
           <div className="space-y-6">
+            {invalidCount > 0 ? (
+              <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 dark:border-amber-900/40 dark:bg-amber-950/20">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                      Se encontraron {invalidCount} evaluaciones con datos incompletos
+                    </p>
+                    <p className="mt-1 text-sm text-amber-700 dark:text-amber-400">
+                      No aparecen en ningun mes porque fueron cargadas sin mes o anio valido.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setDeleteTarget({ type: 'invalid', invalidCount })}
+                    className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white transition-all duration-200 hover:bg-amber-600"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Eliminar datos incompletos
+                  </button>
+                </div>
+              </div>
+            ) : null}
+
             <div>
               <p className="mb-3 text-sm font-medium text-gray-700 dark:text-gray-300">Datos por mes</p>
               <div className="overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-800">
@@ -157,11 +197,19 @@ export function DataManagementPanel({ hospitalId, hospitalName }: DataManagement
         isOpen={deleteTarget !== null}
         onClose={() => setDeleteTarget(null)}
         onConfirm={handleDeleteConfirm}
-        title={deleteTarget?.type === 'mes' ? `Eliminar ${deleteTarget.mesData.label}` : 'Eliminar todos los datos'}
+        title={
+          deleteTarget?.type === 'mes'
+            ? `Eliminar ${deleteTarget.mesData.label}`
+            : deleteTarget?.type === 'invalid'
+              ? 'Eliminar datos incompletos'
+              : 'Eliminar todos los datos'
+        }
         description={
           deleteTarget?.type === 'mes'
             ? `Se eliminaran ${deleteTarget.mesData.count} evaluaciones de ${deleteTarget.mesData.label}. Esta accion no se puede deshacer.`
-            : `Esta accion eliminara permanentemente ${deleteTarget?.totalEvaluaciones ?? 0} evaluaciones de ${deleteTarget?.totalMeses ?? 0} meses. No se puede deshacer.`
+            : deleteTarget?.type === 'invalid'
+              ? `Se eliminaran ${deleteTarget.invalidCount} evaluaciones que fueron cargadas con errores y no aparecen en ningun mes. Esta accion no se puede deshacer.`
+              : `Esta accion eliminara permanentemente ${deleteTarget?.totalEvaluaciones ?? 0} evaluaciones de ${deleteTarget?.totalMeses ?? 0} meses. No se puede deshacer.`
         }
         confirmLabel="Eliminar"
         isDangerous={deleteTarget?.type === 'all'}

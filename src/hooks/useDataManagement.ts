@@ -32,16 +32,19 @@ export interface MesData {
 interface UseDataManagementReturn {
   meses: MesData[];
   totalEvaluaciones: number;
+  invalidCount: number;
   loading: boolean;
   error: string | null;
   deleteMes: (mes: number, anio: number) => Promise<void>;
   deleteAllData: () => Promise<void>;
+  deleteInvalidData: () => Promise<void>;
   refetch: () => Promise<void>;
 }
 
 export function useDataManagement(hospitalId: string | null | undefined): UseDataManagementReturn {
   const [meses, setMeses] = useState<MesData[]>([]);
   const [totalEvaluaciones, setTotalEvaluaciones] = useState(0);
+  const [invalidCount, setInvalidCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -49,6 +52,7 @@ export function useDataManagement(hospitalId: string | null | undefined): UseDat
     if (!hospitalId) {
       setMeses([]);
       setTotalEvaluaciones(0);
+      setInvalidCount(0);
       setError(null);
       setLoading(false);
       return;
@@ -58,16 +62,27 @@ export function useDataManagement(hospitalId: string | null | undefined): UseDat
     setError(null);
 
     try {
-      const { data, error: fetchError } = await getSupabaseClient()
-        .from('evaluaciones')
-        .select('mes, anio')
-        .eq('hospital_id', hospitalId);
+      const supabase = getSupabaseClient();
+      const [monthsResult, invalidResult] = await Promise.all([
+        supabase
+          .from('evaluaciones')
+          .select('mes, anio')
+          .eq('hospital_id', hospitalId),
+        supabase
+          .from('evaluaciones')
+          .select('id', { count: 'exact', head: true })
+          .eq('hospital_id', hospitalId)
+          .or('mes.is.null,mes.eq.0,anio.is.null,anio.eq.0'),
+      ]);
 
-      if (fetchError) {
-        throw fetchError;
+      if (monthsResult.error) {
+        throw monthsResult.error;
+      }
+      if (invalidResult.error) {
+        throw invalidResult.error;
       }
 
-      const rows = (data ?? []) as EvaluacionMonthRow[];
+      const rows = (monthsResult.data ?? []) as EvaluacionMonthRow[];
       const monthMap = new Map<string, MesData>();
 
       for (const row of rows) {
@@ -92,9 +107,11 @@ export function useDataManagement(hospitalId: string | null | undefined): UseDat
 
       setMeses(orderedMonths);
       setTotalEvaluaciones(rows.length);
+      setInvalidCount(invalidResult.count ?? 0);
     } catch (errorValue: unknown) {
       setMeses([]);
       setTotalEvaluaciones(0);
+      setInvalidCount(0);
       setError(errorValue instanceof Error ? errorValue.message : 'No se pudieron cargar los datos del hospital.');
     } finally {
       setLoading(false);
@@ -139,6 +156,25 @@ export function useDataManagement(hospitalId: string | null | undefined): UseDat
     await refetch();
   }, [hospitalId, refetch]);
 
+  const deleteInvalidData = useCallback(async () => {
+    if (!hospitalId) {
+      throw new Error('Selecciona un hospital antes de eliminar datos.');
+    }
+
+    const { error: deleteError } = await getSupabaseClient()
+      .from('evaluaciones')
+      .delete()
+      .eq('hospital_id', hospitalId)
+      .or('mes.is.null,mes.eq.0,anio.is.null,anio.eq.0');
+
+    if (deleteError) {
+      throw deleteError;
+    }
+
+    window.dispatchEvent(new CustomEvent('infectus:data-updated'));
+    await refetch();
+  }, [hospitalId, refetch]);
+
   useEffect(() => {
     void refetch();
   }, [refetch]);
@@ -146,10 +182,12 @@ export function useDataManagement(hospitalId: string | null | undefined): UseDat
   return {
     meses,
     totalEvaluaciones,
+    invalidCount,
     loading,
     error,
     deleteMes,
     deleteAllData,
+    deleteInvalidData,
     refetch,
   };
 }
