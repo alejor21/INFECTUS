@@ -33,6 +33,206 @@ interface HospitalInfo {
   is_active: boolean;
 }
 
+interface EvaluationMetricRow {
+  id: string;
+  mes: number | null;
+  anio: number | null;
+  fecha: string | null;
+  servicio: string | null;
+  diagnostico: string | null;
+  antibiotico_01: string | null;
+  antibiotico_02: string | null;
+  edad: number | null;
+  dias_terapia_01: number | null;
+  dias_terapia_02: number | null;
+  cod_diagnostico: string | null;
+  nombre_paciente: string | null;
+  cama: string | null;
+  observaciones: string | null;
+}
+
+const MONTH_NAMES = [
+  'Enero',
+  'Febrero',
+  'Marzo',
+  'Abril',
+  'Mayo',
+  'Junio',
+  'Julio',
+  'Agosto',
+  'Septiembre',
+  'Octubre',
+  'Noviembre',
+  'Diciembre',
+];
+
+function parseEvaluationMonth(row: EvaluationMetricRow): { year: number; month: number } | null {
+  if (row.anio && row.mes) {
+    return { year: row.anio, month: row.mes };
+  }
+
+  if (!row.fecha) {
+    return null;
+  }
+
+  const parsedDate = new Date(row.fecha);
+  if (Number.isNaN(parsedDate.getTime())) {
+    return null;
+  }
+
+  return {
+    year: parsedDate.getFullYear(),
+    month: parsedDate.getMonth() + 1,
+  };
+}
+
+function topFrequent(map: Map<string, number>, limit: number): Array<{ name: string; count: number }> {
+  return Array.from(map.entries())
+    .sort((left, right) => right[1] - left[1])
+    .slice(0, limit)
+    .map(([name, count]) => ({ name, count }));
+}
+
+function calculateMetricsFromEvaluaciones(rows: EvaluationMetricRow[]): MonthMetrics {
+  if (rows.length === 0) {
+    return { totalRows: 0, columns: [], numericSummary: {}, topValues: {} };
+  }
+
+  const analyticsRows = rows.map((row) => ({
+    servicio: row.servicio,
+    diagnostico: row.diagnostico,
+    antibiotico_01: row.antibiotico_01,
+    antibiotico_02: row.antibiotico_02,
+    edad: row.edad,
+    dias_terapia_01: row.dias_terapia_01,
+    dias_terapia_02: row.dias_terapia_02,
+    cod_diagnostico: row.cod_diagnostico,
+    nombre_paciente: row.nombre_paciente,
+    cama: row.cama,
+    observaciones: row.observaciones,
+  }));
+
+  const columns = Object.keys(analyticsRows[0]);
+  const numericAccum: Record<string, { min: number; max: number; sum: number; count: number }> = {};
+  const valueMaps: Record<string, Map<string, number>> = {};
+  const antibioticMap = new Map<string, number>();
+
+  for (const column of columns) {
+    valueMaps[column] = new Map();
+  }
+
+  for (const row of analyticsRows) {
+    for (const column of columns) {
+      const value = row[column as keyof typeof row];
+      if (value === null || value === undefined || value === '') {
+        continue;
+      }
+
+      if (typeof value === 'number' && !Number.isNaN(value)) {
+        const accumulator = numericAccum[column];
+        if (!accumulator) {
+          numericAccum[column] = { min: value, max: value, sum: value, count: 1 };
+        } else {
+          accumulator.min = Math.min(accumulator.min, value);
+          accumulator.max = Math.max(accumulator.max, value);
+          accumulator.sum += value;
+          accumulator.count += 1;
+        }
+        continue;
+      }
+
+      const stringValue = String(value).trim();
+      if (!stringValue) {
+        continue;
+      }
+
+      valueMaps[column].set(stringValue, (valueMaps[column].get(stringValue) ?? 0) + 1);
+      if (column === 'antibiotico_01' || column === 'antibiotico_02') {
+        antibioticMap.set(stringValue, (antibioticMap.get(stringValue) ?? 0) + 1);
+      }
+    }
+  }
+
+  const numericSummary: MonthMetrics['numericSummary'] = {};
+  for (const [column, accumulator] of Object.entries(numericAccum)) {
+    numericSummary[column] = {
+      min: accumulator.min,
+      max: accumulator.max,
+      avg: accumulator.count > 0 ? accumulator.sum / accumulator.count : 0,
+      sum: accumulator.sum,
+    };
+  }
+
+  const topValues: MonthMetrics['topValues'] = {};
+  for (const column of columns) {
+    const map = valueMaps[column];
+    if (map.size > 0) {
+      topValues[column] = Array.from(map.entries())
+        .sort((left, right) => right[1] - left[1])
+        .slice(0, 5)
+        .map(([value, count]) => ({ value, count }));
+    }
+  }
+
+  const metrics: MonthMetrics = {
+    totalRows: rows.length,
+    columns,
+    numericSummary,
+    topValues,
+  };
+
+  if (antibioticMap.size > 0) {
+    metrics.topAntibiotics = topFrequent(antibioticMap, 10);
+  }
+
+  const serviceMap = valueMaps.servicio;
+  if (serviceMap && serviceMap.size > 0) {
+    metrics.topServices = topFrequent(serviceMap, 10);
+  }
+
+  const diagnosisMap = valueMaps.diagnostico;
+  if (diagnosisMap && diagnosisMap.size > 0) {
+    metrics.topDiagnoses = topFrequent(diagnosisMap, 10);
+  }
+
+  return metrics;
+}
+
+function buildHospitalMonthlyMetrics(
+  hospitalId: string,
+  rows: EvaluationMetricRow[],
+): HospitalMonthlyMetric[] {
+  const groupedRows = new Map<string, EvaluationMetricRow[]>();
+
+  for (const row of rows) {
+    const parsedMonth = parseEvaluationMonth(row);
+    if (!parsedMonth) {
+      continue;
+    }
+
+    const monthKey = `${parsedMonth.year}-${String(parsedMonth.month).padStart(2, '0')}`;
+    const existingRows = groupedRows.get(monthKey) ?? [];
+    existingRows.push(row);
+    groupedRows.set(monthKey, existingRows);
+  }
+
+  return Array.from(groupedRows.entries())
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([month, monthRows]) => {
+      const [yearValue, monthValue] = month.split('-').map((value) => Number.parseInt(value, 10));
+      return {
+        id: `${hospitalId}-${month}`,
+        hospital_id: hospitalId,
+        upload_id: null,
+        month,
+        month_label: `${MONTH_NAMES[monthValue - 1] ?? String(monthValue)} ${yearValue}`,
+        metrics: calculateMetricsFromEvaluaciones(monthRows),
+        row_count: monthRows.length,
+        created_at: monthRows[monthRows.length - 1]?.fecha ?? new Date().toISOString(),
+      };
+    });
+}
+
 // ─── Sub-components ───────────────────────────────────────────────────────
 
 function EmptyState({ onUpload }: { onUpload: (f: File) => void }) {
@@ -208,7 +408,7 @@ export function HospitalDashboard() {
     const supabase = getSupabaseClient();
     const [
       { data: hosp },
-      { data: monthData },
+      { data: evaluationData },
       { data: uploadData },
     ] = await Promise.all([
       supabase
@@ -217,10 +417,30 @@ export function HospitalDashboard() {
         .eq('id', hospitalId)
         .single(),
       supabase
-        .from('hospital_monthly_metrics')
-        .select('*')
+        .from('evaluaciones')
+        .select(
+          [
+            'id',
+            'mes',
+            'anio',
+            'fecha',
+            'servicio',
+            'diagnostico',
+            'antibiotico_01',
+            'antibiotico_02',
+            'edad',
+            'dias_terapia_01',
+            'dias_terapia_02',
+            'cod_diagnostico',
+            'nombre_paciente',
+            'cama',
+            'observaciones',
+          ].join(','),
+        )
         .eq('hospital_id', hospitalId)
-        .order('month', { ascending: true }),
+        .order('anio', { ascending: true })
+        .order('mes', { ascending: true })
+        .order('fecha', { ascending: true }),
       supabase
         .from('hospital_excel_uploads')
         .select('id,hospital_id,user_id,filename,periodo,mes,anio,total_filas,filas_validas,filas_error,estado,errores,created_at,updated_at')
@@ -230,7 +450,7 @@ export function HospitalDashboard() {
     ]);
 
     setHospital(hosp as HospitalInfo | null);
-    const metricRows = (monthData ?? []) as HospitalMonthlyMetric[];
+    const metricRows = buildHospitalMonthlyMetrics(hospitalId, (evaluationData ?? []) as EvaluationMetricRow[]);
     setMonths(metricRows);
     const latestUpload = ((uploadData ?? []) as HospitalExcelUpload[])[0] ?? null;
     setUpload(latestUpload);

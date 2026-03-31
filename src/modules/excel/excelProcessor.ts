@@ -1007,20 +1007,6 @@ export async function processAndSaveExcel(
       uploadId = (upload as InsertedUploadRow).id;
     }
 
-    for (const monthData of monthlyData) {
-      await supabase.from('hospital_monthly_metrics').upsert(
-        {
-          hospital_id: hospitalId,
-          upload_id: uploadId,
-          month: monthData.month,
-          month_label: monthData.monthLabel,
-          metrics: monthData.metrics,
-          row_count: monthData.rowCount,
-        },
-        { onConflict: 'hospital_id,month' },
-      );
-    }
-
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('infectus:data-updated'));
     }

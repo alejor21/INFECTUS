@@ -210,7 +210,7 @@ export const deleteHospitalFileData = async (
   const monthPad = String(month).padStart(2, '0');
   const monthKey = `${year}-${monthPad}`;
 
-  const [legacyDateDelete, isoDateDelete, metricsDelete, fileDelete] = await Promise.all([
+  const [legacyDateDelete, isoDateDelete, evaluacionesDelete, fileDelete] = await Promise.all([
     supabase
       .from('interventions')
       .delete()
@@ -222,10 +222,11 @@ export const deleteHospitalFileData = async (
       .eq('hospital_name', hospitalName)
       .like('fecha', `${monthKey}-%`),
     supabase
-      .from('hospital_monthly_metrics')
+      .from('evaluaciones')
       .delete()
       .eq('hospital_id', hospitalId)
-      .eq('month', monthKey),
+      .eq('anio', year)
+      .eq('mes', month),
     supabase.from('hospital_files').delete().eq('id', fileId),
   ]);
 
@@ -233,7 +234,7 @@ export const deleteHospitalFileData = async (
     error:
       legacyDateDelete.error ??
       isoDateDelete.error ??
-      metricsDelete.error ??
+      evaluacionesDelete.error ??
       fileDelete.error ??
       null,
   };
