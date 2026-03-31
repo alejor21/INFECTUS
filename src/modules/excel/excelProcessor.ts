@@ -240,6 +240,7 @@ export interface ProcessResult {
   filasInsertadas: number;
   filasConError: number;
   mesesDetectados: DetectedMonth[];
+  replacedMonths: string[];
   errores: RowError[];
   error?: string;
 }
@@ -841,6 +842,44 @@ async function insertEvaluaciones(
   return { filasInsertadas, errores };
 }
 
+async function replaceExistingMonthData(
+  hospitalId: string,
+  mesesDetectados: DetectedMonth[],
+): Promise<string[]> {
+  const supabase = getSupabaseClient();
+  const replacedMonths: string[] = [];
+
+  for (const monthData of mesesDetectados) {
+    const { count, error: countError } = await supabase
+      .from('evaluaciones')
+      .select('id', { count: 'exact', head: true })
+      .eq('hospital_id', hospitalId)
+      .eq('mes', monthData.mes)
+      .eq('anio', monthData.anio);
+
+    if (countError) {
+      throw countError;
+    }
+
+    if ((count ?? 0) > 0) {
+      replacedMonths.push(monthData.label);
+    }
+
+    const { error: deleteError } = await supabase
+      .from('evaluaciones')
+      .delete()
+      .eq('hospital_id', hospitalId)
+      .eq('mes', monthData.mes)
+      .eq('anio', monthData.anio);
+
+    if (deleteError) {
+      throw deleteError;
+    }
+  }
+
+  return replacedMonths;
+}
+
 export async function processAndSaveExcel(
   hospitalId: string,
   file: File,
@@ -862,6 +901,7 @@ export async function processAndSaveExcel(
         filasInsertadas: 0,
         filasConError: 0,
         mesesDetectados: [],
+        replacedMonths: [],
         errores: [],
         error: hospitalError?.message ?? 'No se pudo identificar el hospital para cargar el Excel.',
       };
@@ -883,6 +923,7 @@ export async function processAndSaveExcel(
           filasInsertadas: 0,
           filasConError: 0,
           mesesDetectados: [],
+          replacedMonths: [],
           errores: [],
           error: interventionsError,
         };
@@ -902,6 +943,7 @@ export async function processAndSaveExcel(
         filasInsertadas: 0,
         filasConError: 0,
         mesesDetectados: [],
+        replacedMonths: [],
         errores: [{ fila: 1, motivo: 'El archivo está vacío o sin datos' }],
         error: 'El archivo está vacío o sin datos',
       };
@@ -923,11 +965,13 @@ export async function processAndSaveExcel(
         filasInsertadas: 0,
         filasConError: parsingErrors.length,
         mesesDetectados,
+        replacedMonths: [],
         errores: parsingErrors,
         error: 'No se pudo procesar el archivo. Verifica el formato.',
       };
     }
 
+    const replacedMonths = await replaceExistingMonthData(hospitalId, mesesDetectados);
     const { filasInsertadas, errores: insertErrors } = await insertEvaluaciones(parsedRows);
     const errores = [...parsingErrors, ...insertErrors];
 
@@ -984,7 +1028,6 @@ export async function processAndSaveExcel(
     const monthsFound = monthlyData.map((item) => item.month);
     const latestMonth = monthlyData[monthlyData.length - 1] ?? mesesDetectados[0] ?? null;
 
-    let uploadId: string | null = null;
     const { data: upload, error: uploadError } = await supabase
       .from('hospital_excel_uploads')
       .insert({
@@ -1003,9 +1046,8 @@ export async function processAndSaveExcel(
       .select('id')
       .single();
 
-    if (!uploadError && upload) {
-      uploadId = (upload as InsertedUploadRow).id;
-    }
+    void (upload as InsertedUploadRow | null);
+    void uploadError;
 
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('infectus:data-updated'));
@@ -1018,6 +1060,7 @@ export async function processAndSaveExcel(
       filasInsertadas,
       filasConError: errores.length,
       mesesDetectados,
+      replacedMonths,
       errores,
       error: filasInsertadas === 0 ? 'No se pudo procesar el archivo. Verifica el formato.' : undefined,
     };
@@ -1029,6 +1072,7 @@ export async function processAndSaveExcel(
       filasInsertadas: 0,
       filasConError: 0,
       mesesDetectados: [],
+      replacedMonths: [],
       errores: [],
       error: error instanceof Error ? error.message : 'Error desconocido al procesar el archivo',
     };

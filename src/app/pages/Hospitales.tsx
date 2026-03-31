@@ -22,12 +22,11 @@ import {
 } from '../../lib/supabase/hospitals';
 import type { Hospital, HospitalFile } from '../../lib/supabase/hospitals';
 import { getSupabaseClient } from '../../lib/supabase/client';
-import { parseInterventionFile } from '../../lib/parsers/excelParser';
-import { upsertInterventions } from '../../lib/supabase/queries/interventions';
 import { toast } from 'sonner';
 import { processAndSaveExcel } from '../../modules/excel/excelProcessor';
 import { useHospitalFiles } from '../../hooks/useHospitalFiles';
 import { useHospitalUploadStatuses } from '../../hooks/useHospitalUploadStatuses';
+import { useDataManagement } from '../../hooks/useDataManagement';
 import { getCurrentMonthValue } from '../../lib/analytics/proaPeriods';
 import { EmptyState } from '../components/EmptyState';
 import { ProaReportModal } from '../components/ProaReportModal';
@@ -131,6 +130,27 @@ function toMonthValue(year: number, month: number): string {
   return `${year}-${String(month).padStart(2, '0')}`;
 }
 
+function buildUploadSuccessMessage(result: {
+  filasInsertadas: number;
+  filasConError: number;
+  mesesDetectados: Array<{ label: string; count: number }>;
+  replacedMonths: string[];
+}): string {
+  const monthsSummary = result.mesesDetectados
+    .map((monthData) => `${monthData.label} (${monthData.count} filas)`)
+    .join(', ');
+
+  const replaceSummary = result.replacedMonths.length > 0
+    ? ` Se reemplazaron datos de: ${result.replacedMonths.join(', ')}.`
+    : '';
+
+  if (result.filasConError > 0) {
+    return `${result.filasInsertadas} evaluaciones cargadas, ${result.filasConError} con errores. ${monthsSummary}.${replaceSummary}`;
+  }
+
+  return `${result.filasInsertadas} evaluaciones cargadas. ${monthsSummary}.${replaceSummary}`;
+}
+
 export function Hospitales() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -204,6 +224,12 @@ export function Hospitales() {
     statuses: uploadStatuses,
     refresh: refreshUploadStatuses,
   } = useHospitalUploadStatuses(hospitals.map((hospital) => hospital.id));
+  const {
+    meses: loadedMonths,
+    totalEvaluaciones: loadedTotalEvaluaciones,
+    loading: loadedMonthsLoading,
+    refetch: refreshLoadedMonths,
+  } = useDataManagement(activeHospital?.id ?? null);
 
   const filteredHospitals = useMemo(() => {
     const query = normalizeText(hospitalSearch.trim());
@@ -307,8 +333,14 @@ export function Hospitales() {
         toast.info('Procesando Excel...');
         const result = await processAndSaveExcel(newHospital.id, addExcelFile, user.id);
         if (result.success) {
-          toast.success(`Hospital creado y Excel procesado: ${result.monthsFound.length} mes${result.monthsFound.length !== 1 ? 'es' : ''}, ${result.totalRows} registros.`);
+          const successMessage = `Hospital creado. ${buildUploadSuccessMessage(result)}`;
+          if (result.filasConError > 0) {
+            toast.warning(successMessage);
+          } else {
+            toast.success(successMessage);
+          }
           await refreshUploadStatuses();
+          await refreshLoadedMonths();
         } else {
           toast.error(result.error ?? 'Error al procesar el Excel.');
         }
@@ -448,7 +480,10 @@ export function Hospitales() {
   };
 
   const handleUploadFile = async (pendingId: string) => {
-    if (!activeHospital) return;
+    if (!activeHospital || !user?.id) {
+      toast.error('Debes iniciar sesion para actualizar archivos Excel.');
+      return;
+    }
     const pf = pendingFiles.find((p) => p.id === pendingId);
     if (!pf) return;
 
@@ -457,41 +492,48 @@ export function Hospitales() {
     );
 
     try {
-      const { valid, errors, aiWarning } = await parseInterventionFile(pf.file);
-      if (valid.length === 0) {
+      const result = await processAndSaveExcel(activeHospital.id, pf.file, user.id);
+      const errors = result.errores.map((errorItem) => ({ message: errorItem.motivo }));
+      if (!result.success) {
         throw new Error(errors.length > 0 ? errors[0].message : 'Sin registros válidos en el archivo.');
       }
 
-      const recordsWithHospital = valid.map((record) => ({ ...record, hospitalName: activeHospital.name }));
-      const { inserted, error: uploadError } = await upsertInterventions(recordsWithHospital);
-      if (uploadError) throw new Error(uploadError);
+      const latestDetectedMonth = result.mesesDetectados[0];
+      const fileMonth = latestDetectedMonth?.mes ?? pf.month;
+      const fileYear = latestDetectedMonth?.anio ?? pf.year;
 
       await saveHospitalFile({
         hospital_id: activeHospital.id,
         file_name: pf.file.name,
-        month: pf.month,
-        year: pf.year,
-        record_count: inserted,
-        uploaded_by: user?.id ?? null,
+        month: fileMonth,
+        year: fileYear,
+        record_count: result.filasInsertadas,
+        uploaded_by: user.id,
       });
 
       await refreshActiveFiles();
       await refreshUploadStatuses();
+      await refreshLoadedMonths();
       window.dispatchEvent(new CustomEvent('infectus:data-updated'));
 
       setPendingFiles((prev) =>
         prev.map((p) =>
           p.id === pendingId
-            ? { ...p, status: 'done', message: `${inserted} registros cargados`, aiWarning }
+            ? { ...p, status: 'done', message: `${result.filasInsertadas} registros cargados` }
             : p,
         ),
       );
       setReportPrompt({
         hospitalId: activeHospital.id,
-        month: toMonthValue(pf.year, pf.month),
-        message: `${inserted} registros listos para generar el reporte del comite.`,
+        month: toMonthValue(fileYear, fileMonth),
+        message: buildUploadSuccessMessage(result),
       });
-      toast.success(`${inserted} registros cargados correctamente.`);
+      const successMessage = buildUploadSuccessMessage(result);
+      if (result.filasConError > 0) {
+        toast.warning(successMessage);
+      } else {
+        toast.success(successMessage);
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       setPendingFiles((prev) =>
@@ -539,12 +581,18 @@ export function Hospitales() {
     toast.info('Procesando Excel...');
     const result = await processAndSaveExcel(hospitalId, file, user.id);
     if (result.success) {
-      toast.success(`Excel actualizado: ${result.monthsFound.length} mes${result.monthsFound.length !== 1 ? 'es' : ''}, ${result.totalRows} registros.`);
+      const successMessage = buildUploadSuccessMessage(result);
+      if (result.filasConError > 0) {
+        toast.warning(successMessage);
+      } else {
+        toast.success(successMessage);
+      }
       await refreshUploadStatuses();
+      await refreshLoadedMonths();
       setReportPrompt({
         hospitalId,
         month: result.monthsFound[result.monthsFound.length - 1] ?? getCurrentMonthValue(),
-        message: `Excel actualizado con ${result.totalRows} registros. Ya puedes generar el reporte del mes.`,
+        message: successMessage,
       });
     } else {
       toast.error(result.error ?? 'Error al procesar el Excel.');
@@ -1065,6 +1113,36 @@ export function Hospitales() {
         <div className="max-w-3xl">
 
           {/* ── TOP: Drop zone ── */}
+          {loadedMonthsLoading ? (
+            <div className="mb-4 rounded-xl border border-gray-200 bg-gray-50 p-4">
+              <p className="text-sm font-medium text-gray-600">Cargando meses con datos...</p>
+            </div>
+          ) : loadedMonths.length > 0 ? (
+            <div className="mb-4 rounded-xl border border-teal-200 bg-teal-50 p-4">
+              <p className="text-sm font-semibold text-teal-900">
+                Meses con datos cargados ({loadedMonths.length})
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {loadedMonths.map((monthData) => (
+                  <span
+                    key={monthData.value}
+                    className="rounded-full border border-teal-200 bg-white px-3 py-1 text-xs font-medium text-teal-700"
+                  >
+                    {monthData.label} ({monthData.count})
+                  </span>
+                ))}
+              </div>
+              <p className="mt-3 text-sm text-teal-700">
+                {loadedTotalEvaluaciones} evaluaciones registradas. Si subes un Excel con estos meses, los datos existentes se reemplazaran automaticamente.
+              </p>
+            </div>
+          ) : (
+            <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+              <p className="text-sm font-semibold text-emerald-900">No hay datos cargados.</p>
+              <p className="mt-1 text-sm text-emerald-700">Sube tu primer Excel para comenzar.</p>
+            </div>
+          )}
+
           <div
             onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
             onDragLeave={() => setIsDragging(false)}
