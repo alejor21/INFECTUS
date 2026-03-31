@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, ty
 import { Building2, Camera, Globe, KeyRound, Loader2, Lock, Mail, Moon, ShieldAlert, Sun, Users } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
+import { DataManagementPanel } from '../../components/DataManagementPanel';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { EmptyState } from '../components/EmptyState';
 import { useAuth, type Profile } from '../../contexts/AuthContext';
@@ -547,6 +548,11 @@ export function Configuracion() {
           />
         )}
       </SettingsCard>
+
+      <DataManagementPanel
+        hospitalId={selectedHospitalObj?.id ?? null}
+        hospitalName={selectedHospitalObj?.name ?? null}
+      />
 
       <SettingsCard
         title="Gestión de usuarios"
