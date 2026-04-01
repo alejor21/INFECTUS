@@ -2,8 +2,37 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { useAuth } from './AuthContext';
 import type { Hospital, HospitalFile } from '../lib/supabase/hospitals';
 import { getHospitals, getHospitalFiles } from '../lib/supabase/hospitals';
+import { getSupabaseClient } from '../lib/supabase/client';
 import { getInterventionsByDateRange } from '../lib/supabase/queries/interventions';
 import type { InterventionRecord } from '../types';
+
+const MONTH_NAMES = [
+  'Enero',
+  'Febrero',
+  'Marzo',
+  'Abril',
+  'Mayo',
+  'Junio',
+  'Julio',
+  'Agosto',
+  'Septiembre',
+  'Octubre',
+  'Noviembre',
+  'Diciembre',
+];
+
+interface EvaluationMonthRow {
+  mes: number | null;
+  anio: number | null;
+}
+
+export interface HospitalMonthOption {
+  mes: number;
+  anio: number;
+  label: string;
+  count: number;
+  value: string;
+}
 
 interface HospitalContextValue {
   // Legacy string field — keeps existing consumers working without changes
@@ -36,6 +65,14 @@ interface HospitalContextValue {
   // Date range filter
   dateRange: '1m' | '6m' | '12m' | 'all';
   setDateRange: (r: '1m' | '6m' | '12m' | 'all') => void;
+
+  // Shared month filter for PROA data
+  availableMonths: HospitalMonthOption[];
+  monthsLoading: boolean;
+  selectedMonth: HospitalMonthOption | null;
+  selectedMonthValue: string | null;
+  setSelectedMonthValue: (value: string | null) => void;
+  refreshAvailableMonths: () => Promise<void>;
 }
 
 // Parse fecha string (DD/MM/YYYY or YYYY-MM-DD) into a Date
@@ -62,6 +99,10 @@ function applyDateRange(
   });
 }
 
+function toMonthValue(anio: number, mes: number): string {
+  return `${anio}-${String(mes).padStart(2, '0')}`;
+}
+
 export const HospitalContext = createContext<HospitalContextValue>({
   selectedHospital: '',
   setSelectedHospital: () => {},
@@ -79,6 +120,12 @@ export const HospitalContext = createContext<HospitalContextValue>({
   refreshRecords: async () => {},
   dateRange: '6m',
   setDateRange: () => {},
+  availableMonths: [],
+  monthsLoading: false,
+  selectedMonth: null,
+  selectedMonthValue: null,
+  setSelectedMonthValue: () => {},
+  refreshAvailableMonths: async () => {},
 });
 
 export function useHospitalContext() {
@@ -92,12 +139,16 @@ export function HospitalProvider({ children }: { children: React.ReactNode }) {
   const [hospitalFiles, setHospitalFiles] = useState<HospitalFile[]>([]);
   const [dateRange, setDateRange] = useState<'1m' | '6m' | '12m' | 'all'>('6m');
   const [allRawRecords, setAllRawRecords] = useState<InterventionRecord[]>([]);
+  const [availableMonths, setAvailableMonths] = useState<HospitalMonthOption[]>([]);
+  const [selectedMonthValue, setSelectedMonthValueState] = useState<string | null>(null);
+  const [monthsLoading, setMonthsLoading] = useState(false);
   const [recordsLoading, setRecordsLoading] = useState(false);
   const [hospitalsLoading, setHospitalsLoading] = useState(false);
   const [hospitalsError, setHospitalsError] = useState<string | null>(null);
 
   // Derived string — keeps legacy consumers (e.g. Dashboard patient table) working
   const selectedHospital = selectedHospitalObj?.name ?? '';
+  const selectedHospitalId = selectedHospitalObj?.id ?? null;
 
   // Derived filtered records — recomputed whenever source data or filters change
   const records = useMemo(() => {
@@ -107,6 +158,11 @@ export function HospitalProvider({ children }: { children: React.ReactNode }) {
     }
     return applyDateRange(filtered, dateRange);
   }, [allRawRecords, selectedHospitalObj, dateRange]);
+
+  const selectedMonth = useMemo(
+    () => availableMonths.find((monthOption) => monthOption.value === selectedMonthValue) ?? null,
+    [availableMonths, selectedMonthValue],
+  );
 
   const setSelectedHospital = useCallback(
     (name: string) => {
@@ -121,6 +177,10 @@ export function HospitalProvider({ children }: { children: React.ReactNode }) {
 
   const setSelectedHospitalObj = useCallback((h: Hospital | null) => {
     setSelectedHospitalObjState(h);
+  }, []);
+
+  const setSelectedMonthValue = useCallback((value: string | null) => {
+    setSelectedMonthValueState(value);
   }, []);
 
   const refreshHospitals = useCallback(async () => {
@@ -161,6 +221,66 @@ export function HospitalProvider({ children }: { children: React.ReactNode }) {
     const data = await getHospitalFiles(selectedHospitalObj.id);
     setHospitalFiles(data);
   }, [selectedHospitalObj]);
+
+  const refreshAvailableMonths = useCallback(async () => {
+    if (!selectedHospitalId) {
+      setAvailableMonths([]);
+      setSelectedMonthValueState(null);
+      setMonthsLoading(false);
+      return;
+    }
+
+    setMonthsLoading(true);
+
+    try {
+      const { data, error } = await getSupabaseClient()
+        .from('evaluaciones')
+        .select('mes, anio')
+        .eq('hospital_id', selectedHospitalId)
+        .not('mes', 'is', null)
+        .not('anio', 'is', null);
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      const monthMap = new Map<string, HospitalMonthOption>();
+      for (const row of (data ?? []) as EvaluationMonthRow[]) {
+        if (!row.mes || !row.anio) {
+          continue;
+        }
+
+        const value = toMonthValue(row.anio, row.mes);
+        const existing = monthMap.get(value);
+        monthMap.set(value, {
+          mes: row.mes,
+          anio: row.anio,
+          label: `${MONTH_NAMES[row.mes - 1]} ${row.anio}`,
+          count: (existing?.count ?? 0) + 1,
+          value,
+        });
+      }
+
+      const orderedMonths = Array.from(monthMap.values()).sort(
+        (left, right) => right.anio - left.anio || right.mes - left.mes,
+      );
+
+      setAvailableMonths(orderedMonths);
+      setSelectedMonthValueState((currentValue) => {
+        if (orderedMonths.length === 0) {
+          return null;
+        }
+
+        if (currentValue && orderedMonths.some((monthOption) => monthOption.value === currentValue)) {
+          return currentValue;
+        }
+
+        return orderedMonths[0].value;
+      });
+    } finally {
+      setMonthsLoading(false);
+    }
+  }, [selectedHospitalId]);
 
   const refreshRecords = useCallback(async () => {
     if (authLoading) {
@@ -214,6 +334,11 @@ export function HospitalProvider({ children }: { children: React.ReactNode }) {
     }
   }, [hospitals, selectedHospitalObj]);
 
+  useEffect(() => {
+    setSelectedMonthValueState(null);
+    setAvailableMonths([]);
+  }, [selectedHospitalId]);
+
   // Reset dateRange when selected hospital changes
   useEffect(() => {
     setDateRange('6m');
@@ -228,16 +353,27 @@ export function HospitalProvider({ children }: { children: React.ReactNode }) {
     return () => { isMounted = false; };
   }, [selectedHospitalObj, refreshFiles]);
 
+  useEffect(() => {
+    let isMounted = true;
+    refreshAvailableMonths().then(() => {
+      if (!isMounted) return;
+    });
+    return () => { isMounted = false; };
+  }, [refreshAvailableMonths]);
+
   // Refresh records when a file upload completes
   useEffect(() => {
-    const handler = () => { 
+    const handler = () => {
       refreshRecords().catch(() => {
         // Silent fail - already handled in refreshRecords
+      });
+      refreshAvailableMonths().catch(() => {
+        // Silent fail - already handled in callers that consume the state
       });
     };
     window.addEventListener('infectus:data-updated', handler);
     return () => { window.removeEventListener('infectus:data-updated', handler); };
-  }, [refreshRecords]);
+  }, [refreshAvailableMonths, refreshRecords]);
 
   return (
     <HospitalContext.Provider
@@ -258,6 +394,12 @@ export function HospitalProvider({ children }: { children: React.ReactNode }) {
         refreshRecords,
         dateRange,
         setDateRange,
+        availableMonths,
+        monthsLoading,
+        selectedMonth,
+        selectedMonthValue,
+        setSelectedMonthValue,
+        refreshAvailableMonths,
       }}
     >
       {children}

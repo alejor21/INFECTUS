@@ -26,7 +26,6 @@ import { toast } from 'sonner';
 import { processAndSaveExcel } from '../../modules/excel/excelProcessor';
 import { useHospitalFiles } from '../../hooks/useHospitalFiles';
 import { useHospitalUploadStatuses } from '../../hooks/useHospitalUploadStatuses';
-import { useDataManagement } from '../../hooks/useDataManagement';
 import { getCurrentMonthValue } from '../../lib/analytics/proaPeriods';
 import { EmptyState } from '../components/EmptyState';
 import { ProaReportModal } from '../components/ProaReportModal';
@@ -163,6 +162,11 @@ export function Hospitales() {
     hospitalsError,
     dateRange,
     setDateRange,
+    availableMonths,
+    monthsLoading,
+    selectedMonthValue,
+    setSelectedMonthValue,
+    refreshAvailableMonths,
   } = useHospitalContext();
 
   // View state
@@ -224,12 +228,6 @@ export function Hospitales() {
     statuses: uploadStatuses,
     refresh: refreshUploadStatuses,
   } = useHospitalUploadStatuses(hospitals.map((hospital) => hospital.id));
-  const {
-    meses: loadedMonths,
-    totalEvaluaciones: loadedTotalEvaluaciones,
-    loading: loadedMonthsLoading,
-    refetch: refreshLoadedMonths,
-  } = useDataManagement(activeHospital?.id ?? null);
 
   const filteredHospitals = useMemo(() => {
     const query = normalizeText(hospitalSearch.trim());
@@ -248,6 +246,11 @@ export function Hospitales() {
       ].some((value) => normalizeText(value).includes(query)),
     );
   }, [hospitalSearch, hospitals]);
+
+  const loadedTotalEvaluaciones = useMemo(
+    () => availableMonths.reduce((total, monthData) => total + monthData.count, 0),
+    [availableMonths],
+  );
 
   const openDetail = useCallback((h: Hospital) => {
     setSelectedHospitalObj(h);
@@ -340,7 +343,7 @@ export function Hospitales() {
             toast.success(successMessage);
           }
           await refreshUploadStatuses();
-          await refreshLoadedMonths();
+          await refreshAvailableMonths();
         } else {
           toast.error(result.error ?? 'Error al procesar el Excel.');
         }
@@ -513,7 +516,7 @@ export function Hospitales() {
 
       await refreshActiveFiles();
       await refreshUploadStatuses();
-      await refreshLoadedMonths();
+      await refreshAvailableMonths();
       window.dispatchEvent(new CustomEvent('infectus:data-updated'));
 
       setPendingFiles((prev) =>
@@ -588,7 +591,7 @@ export function Hospitales() {
         toast.success(successMessage);
       }
       await refreshUploadStatuses();
-      await refreshLoadedMonths();
+      await refreshAvailableMonths();
       setReportPrompt({
         hospitalId,
         month: result.monthsFound[result.monthsFound.length - 1] ?? getCurrentMonthValue(),
@@ -1113,24 +1116,33 @@ export function Hospitales() {
         <div className="max-w-3xl">
 
           {/* ── TOP: Drop zone ── */}
-          {loadedMonthsLoading ? (
+          {monthsLoading ? (
             <div className="mb-4 rounded-xl border border-gray-200 bg-gray-50 p-4">
               <p className="text-sm font-medium text-gray-600">Cargando meses con datos...</p>
             </div>
-          ) : loadedMonths.length > 0 ? (
+          ) : availableMonths.length > 0 ? (
             <div className="mb-4 rounded-xl border border-teal-200 bg-teal-50 p-4">
               <p className="text-sm font-semibold text-teal-900">
-                Meses con datos cargados ({loadedMonths.length})
+                Meses con datos cargados ({availableMonths.length})
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
-                {loadedMonths.map((monthData) => (
-                  <span
+                {availableMonths.map((monthData) => {
+                  const isSelectedMonth = selectedMonthValue === monthData.value;
+
+                  return (
+                  <button
                     key={monthData.value}
-                    className="rounded-full border border-teal-200 bg-white px-3 py-1 text-xs font-medium text-teal-700"
+                    type="button"
+                    onClick={() => setSelectedMonthValue(monthData.value)}
+                    className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                      isSelectedMonth
+                        ? 'border-teal-600 bg-teal-600 text-white'
+                        : 'border-teal-200 bg-white text-teal-700 hover:border-teal-300 hover:bg-teal-100'
+                    }`}
                   >
                     {monthData.label} ({monthData.count})
-                  </span>
-                ))}
+                  </button>
+                )})}
               </div>
               <p className="mt-3 text-sm text-teal-700">
                 {loadedTotalEvaluaciones} evaluaciones registradas. Si subes un Excel con estos meses, los datos existentes se reemplazaran automaticamente.

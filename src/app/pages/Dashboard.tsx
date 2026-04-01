@@ -14,7 +14,7 @@ import {
 import { useAuth } from '../../contexts/AuthContext';
 import { useHospitalContext } from '../../contexts/HospitalContext';
 import { useDashboardStats } from '../../hooks/useDashboardStats';
-import { filterRecordsByMonth, getCurrentMonthValue } from '../../lib/analytics/proaPeriods';
+import { getCurrentMonthValue } from '../../lib/analytics/proaPeriods';
 import { EmptyState } from '../components/EmptyState';
 import { ProaReportModal } from '../components/ProaReportModal';
 import { InfoTooltip } from '../components/Tooltip';
@@ -144,7 +144,15 @@ function DashboardSkeleton() {
 export function Dashboard() {
   const navigate = useNavigate();
   const { profile } = useAuth();
-  const { allRawRecords, hospitalsLoading, selectedHospitalObj } = useHospitalContext();
+  const {
+    hospitalsLoading,
+    selectedHospitalObj,
+    availableMonths,
+    monthsLoading,
+    selectedMonth,
+    selectedMonthValue,
+    setSelectedMonthValue,
+  } = useHospitalContext();
   const { stats, loading: dataLoading, error, refetch } = useDashboardStats(selectedHospitalObj?.id ?? null);
 
   const [modulesOpen, setModulesOpen] = useState(false);
@@ -159,16 +167,11 @@ export function Dashboard() {
   }, [profile?.id]);
 
   const hasHospital = Boolean(selectedHospitalObj);
-  const isLoading = hospitalsLoading || dataLoading;
+  const isLoading = hospitalsLoading || monthsLoading || dataLoading;
   const hasNoData = hasHospital && !isLoading && stats === null;
   const firstName = profile?.full_name?.split(' ')[0] || 'Doctor';
-  const currentMonth = getCurrentMonthValue();
-  const currentMonthCount = selectedHospitalObj
-    ? filterRecordsByMonth(
-        allRawRecords.filter((record) => record.hospitalName === selectedHospitalObj.name),
-        currentMonth,
-      ).length
-    : 0;
+  const currentMonth = selectedMonthValue ?? getCurrentMonthValue();
+  const currentMonthCount = selectedMonth?.count ?? 0;
 
   const recommendedAction: RecommendedAction = !hasHospital
     ? {
@@ -245,10 +248,24 @@ export function Dashboard() {
               </div>
               <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                 {selectedHospitalObj
-                  ? `${selectedHospitalObj.name} - ${stats?.periodoLabel ?? 'Todos los datos'} - ${stats?.totalEvaluaciones ?? 0} evaluaciones`
+                  ? `${selectedHospitalObj.name} - ${selectedMonth?.label ?? stats?.periodoLabel ?? 'Sin periodo'} - ${stats?.totalEvaluaciones ?? 0} evaluaciones`
                   : ''}
               </p>
             </div>
+
+            {availableMonths.length > 0 ? (
+              <select
+                value={selectedMonthValue ?? ''}
+                onChange={(event) => setSelectedMonthValue(event.target.value || null)}
+                className="min-h-[44px] rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 outline-none transition-colors focus:border-teal-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
+              >
+                {availableMonths.map((monthOption) => (
+                  <option key={monthOption.value} value={monthOption.value}>
+                    {monthOption.label} ({monthOption.count} eval)
+                  </option>
+                ))}
+              </select>
+            ) : null}
 
             <button
               onClick={() => navigate('/evaluacion')}
