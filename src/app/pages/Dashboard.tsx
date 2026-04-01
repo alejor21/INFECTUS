@@ -153,7 +153,11 @@ export function Dashboard() {
     selectedMonthValue,
     setSelectedMonthValue,
   } = useHospitalContext();
-  const { stats, loading: dataLoading, error, refetch } = useDashboardStats(selectedHospitalObj?.id ?? null);
+  const { stats, loading: dataLoading, error, refetch } = useDashboardStats(
+    selectedHospitalObj?.id ?? null,
+    selectedMonth?.mes ?? null,
+    selectedMonth?.anio ?? null,
+  );
 
   const [modulesOpen, setModulesOpen] = useState(false);
   const [showWelcome, setShowWelcome] = useState(false);

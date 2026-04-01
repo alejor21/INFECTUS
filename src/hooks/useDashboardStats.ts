@@ -84,14 +84,18 @@ function buildPeriodoLabel(first: EvaluacionDashboardRow | undefined): string {
   return 'Todos los datos';
 }
 
-export function useDashboardStats(hospitalId: string | null | undefined) {
+export function useDashboardStats(
+  hospitalId: string | null | undefined,
+  mes: number | null,
+  anio: number | null,
+) {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fetchStats = useCallback(
     async (cancellation?: FetchCancellation) => {
-      if (!hospitalId) {
+      if (!hospitalId || !mes || !anio) {
         setStats(null);
         setError(null);
         setLoading(false);
@@ -103,36 +107,39 @@ export function useDashboardStats(hospitalId: string | null | undefined) {
 
       try {
         const supabase = getSupabaseClient();
+        const evaluacionesQuery = supabase
+          .from('evaluaciones')
+          .select(
+            [
+              'aprobacion_terapia',
+              'cultivos_previos',
+              'terapia_empirica',
+              'servicio',
+              'conducta_general',
+              'tipo_intervencion',
+              'mes',
+              'anio',
+              'fecha',
+            ].join(', '),
+          )
+          .eq('hospital_id', hospitalId)
+          .eq('mes', mes)
+          .eq('anio', anio)
+          .order('fecha', { ascending: false });
+
+        const recentQuery = supabase
+          .from('evaluaciones')
+          .select('id, hospital_name, status, created_at, progress_pct')
+          .eq('hospital_id', hospitalId)
+          .eq('mes', mes)
+          .eq('anio', anio)
+          .order('created_at', { ascending: false })
+          .limit(5);
+
         const [
           { data, error: dbError },
           { data: recentRows, error: recentError },
-        ] = await Promise.all([
-          supabase
-            .from('evaluaciones')
-            .select(
-              [
-                'aprobacion_terapia',
-                'cultivos_previos',
-                'terapia_empirica',
-                'servicio',
-                'conducta_general',
-                'tipo_intervencion',
-                'mes',
-                'anio',
-                'fecha',
-              ].join(', '),
-            )
-            .eq('hospital_id', hospitalId)
-            .order('anio', { ascending: false })
-            .order('mes', { ascending: false })
-            .order('fecha', { ascending: false }),
-          supabase
-            .from('evaluaciones')
-            .select('id, hospital_name, status, created_at, progress_pct')
-            .eq('hospital_id', hospitalId)
-            .order('created_at', { ascending: false })
-            .limit(5),
-        ]);
+        ] = await Promise.all([evaluacionesQuery, recentQuery]);
 
         if (cancellation?.cancelled) {
           return;
@@ -180,7 +187,7 @@ export function useDashboardStats(hospitalId: string | null | undefined) {
           pctAprobacion: pct(adheridos, totalEvaluaciones),
           pctCultivos: pct(cultivos, totalEvaluaciones),
           pctEmpirica: pct(empirica, totalEvaluaciones),
-          periodoLabel: buildPeriodoLabel(evaluaciones[0]),
+          periodoLabel: MESES[mes - 1] ? `${MESES[mes - 1]} ${anio}` : buildPeriodoLabel(evaluaciones[0]),
           adherenciaData: {
             adheridos,
             noAdheridos,
@@ -211,7 +218,7 @@ export function useDashboardStats(hospitalId: string | null | undefined) {
         }
       }
     },
-    [hospitalId],
+    [hospitalId, mes, anio],
   );
 
   useEffect(() => {
