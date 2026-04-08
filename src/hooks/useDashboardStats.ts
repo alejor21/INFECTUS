@@ -1,4 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
+import {
+  formatMonthYear,
+  PROA_INTERVENTION_TYPE_LABELS,
+} from '../lib/constants';
 import { getSupabaseClient } from '../lib/supabase/client';
 
 export interface RecentEval {
@@ -42,42 +46,29 @@ interface FetchCancellation {
   cancelled: boolean;
 }
 
-const MESES = [
-  'Enero',
-  'Febrero',
-  'Marzo',
-  'Abril',
-  'Mayo',
-  'Junio',
-  'Julio',
-  'Agosto',
-  'Septiembre',
-  'Octubre',
-  'Noviembre',
-  'Diciembre',
-];
+const pct = (n: number, total: number): number =>
+  total === 0 ? 0 : Math.round((n / total) * 1000) / 10;
 
-const TIPO_LABELS: Record<string, string> = {
-  IC: 'Interconsultas',
-  PROA: 'Captadas PROA',
-  REV: 'Revaloración',
-};
-
-const pct = (n: number, total: number): number => (total === 0 ? 0 : Math.round((n / total) * 1000) / 10);
-
-function buildPeriodoLabel(first: EvaluacionDashboardRow | undefined): string {
+function buildPeriodoLabel(
+  first: EvaluacionDashboardRow | undefined,
+): string {
   if (!first) {
     return 'Todos los datos';
   }
 
   if (first.mes && first.anio) {
-    return `${MESES[first.mes - 1]} ${first.anio}`;
+    return formatMonthYear(first.mes, first.anio) ?? 'Todos los datos';
   }
 
   if (first.fecha) {
     const parsed = new Date(first.fecha);
     if (!Number.isNaN(parsed.getTime())) {
-      return `${MESES[parsed.getMonth()]} ${parsed.getFullYear()}`;
+      return (
+        formatMonthYear(
+          parsed.getMonth() + 1,
+          parsed.getFullYear(),
+        ) ?? 'Todos los datos'
+      );
     }
   }
 
@@ -146,12 +137,17 @@ export function useDashboardStats(
         }
 
         if (dbError || recentError) {
-          setError(dbError?.message ?? recentError?.message ?? 'Error al cargar los datos del dashboard');
+          setError(
+            dbError?.message ??
+              recentError?.message ??
+              'Error al cargar los datos del dashboard',
+          );
           return;
         }
 
-        const evaluaciones = (data ?? []) as unknown as EvaluacionDashboardRow[];
-        const recentEvals = ((recentRows ?? []) as RecentEval[]);
+        const evaluaciones =
+          (data ?? []) as unknown as EvaluacionDashboardRow[];
+        const recentEvals = (recentRows ?? []) as RecentEval[];
 
         if (evaluaciones.length === 0) {
           setStats(null);
@@ -159,21 +155,35 @@ export function useDashboardStats(
         }
 
         const totalEvaluaciones = evaluaciones.length;
-        const adheridos = evaluaciones.filter((evaluacion) => evaluacion.aprobacion_terapia === true).length;
-        const noAdheridos = evaluaciones.filter((evaluacion) => evaluacion.aprobacion_terapia === false).length;
-        const cultivos = evaluaciones.filter((evaluacion) => evaluacion.cultivos_previos === true).length;
-        const empirica = evaluaciones.filter((evaluacion) => evaluacion.terapia_empirica === true).length;
+        const adheridos = evaluaciones.filter(
+          (evaluacion) => evaluacion.aprobacion_terapia === true,
+        ).length;
+        const noAdheridos = evaluaciones.filter(
+          (evaluacion) => evaluacion.aprobacion_terapia === false,
+        ).length;
+        const cultivos = evaluaciones.filter(
+          (evaluacion) => evaluacion.cultivos_previos === true,
+        ).length;
+        const empirica = evaluaciones.filter(
+          (evaluacion) => evaluacion.terapia_empirica === true,
+        ).length;
 
         const conductaMap = new Map<string, number>();
         for (const evaluacion of evaluaciones) {
           const conducta = evaluacion.conducta_general ?? 'Sin registrar';
-          conductaMap.set(conducta, (conductaMap.get(conducta) ?? 0) + 1);
+          conductaMap.set(
+            conducta,
+            (conductaMap.get(conducta) ?? 0) + 1,
+          );
         }
 
         const servicioMap = new Map<string, number>();
         for (const evaluacion of evaluaciones) {
           const servicio = evaluacion.servicio ?? 'Sin registrar';
-          servicioMap.set(servicio, (servicioMap.get(servicio) ?? 0) + 1);
+          servicioMap.set(
+            servicio,
+            (servicioMap.get(servicio) ?? 0) + 1,
+          );
         }
 
         const tipoMap = new Map<string, number>();
@@ -187,7 +197,8 @@ export function useDashboardStats(
           pctAprobacion: pct(adheridos, totalEvaluaciones),
           pctCultivos: pct(cultivos, totalEvaluaciones),
           pctEmpirica: pct(empirica, totalEvaluaciones),
-          periodoLabel: MESES[mes - 1] ? `${MESES[mes - 1]} ${anio}` : buildPeriodoLabel(evaluaciones[0]),
+          periodoLabel:
+            formatMonthYear(mes, anio) ?? buildPeriodoLabel(evaluaciones[0]),
           adherenciaData: {
             adheridos,
             noAdheridos,
@@ -202,7 +213,7 @@ export function useDashboardStats(
           tipoData: Array.from(tipoMap.entries())
             .map(([tipo, count]) => ({
               tipo,
-              label: TIPO_LABELS[tipo] ?? tipo,
+              label: PROA_INTERVENTION_TYPE_LABELS[tipo] ?? tipo,
               count,
             }))
             .sort((left, right) => right.count - left.count),

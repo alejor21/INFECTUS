@@ -25,6 +25,7 @@ CREATE TABLE hospital_files (
 );
 */
 
+import { formatMonthYear } from '../constants';
 import { getSupabaseClient } from './client';
 
 export interface Hospital {
@@ -70,27 +71,7 @@ function formatUploadPeriod(periodo: string | null, mes: number | null, anio: nu
     return periodo;
   }
 
-  if (mes === null || anio === null) {
-    return null;
-  }
-
-  const monthNames = [
-    'Enero',
-    'Febrero',
-    'Marzo',
-    'Abril',
-    'Mayo',
-    'Junio',
-    'Julio',
-    'Agosto',
-    'Septiembre',
-    'Octubre',
-    'Noviembre',
-    'Diciembre',
-  ];
-
-  const monthLabel = monthNames[mes - 1];
-  return monthLabel ? `${monthLabel} ${anio}` : String(anio);
+  return formatMonthYear(mes, anio);
 }
 
 export const getHospitals = async (): Promise<Hospital[]> => {

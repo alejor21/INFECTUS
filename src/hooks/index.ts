@@ -4,7 +4,6 @@ export { useDataManagement } from './useDataManagement';
 export { useDebounce } from './useDebounce';
 export { useFileUpload } from './useFileUpload';
 export { useGroqReports } from './useGroqReports';
-export { useHospitals } from './useHospitals';
 export { useIntersectionObserver } from './useIntersectionObserver';
 export { useLazy } from './useLazy';
 export { useTour } from './useTour';

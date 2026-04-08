@@ -1,28 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
+import {
+  formatMonthYear,
+  PROA_INTERVENTION_TYPE_LABELS,
+} from '../lib/constants';
 import { getSupabaseClient } from '../lib/supabase/client';
 
-const MESES = [
-  'Enero',
-  'Febrero',
-  'Marzo',
-  'Abril',
-  'Mayo',
-  'Junio',
-  'Julio',
-  'Agosto',
-  'Septiembre',
-  'Octubre',
-  'Noviembre',
-  'Diciembre',
-];
-
-const TIPO_LABELS: Record<string, string> = {
-  IC: 'Interconsultas',
-  PROA: 'Captadas PROA',
-  REV: 'Revaloración',
-};
-
-const pct = (n: number, total: number): number => (total === 0 ? 0 : Math.round((n / total) * 1000) / 10);
+const pct = (n: number, total: number): number =>
+  total === 0 ? 0 : Math.round((n / total) * 1000) / 10;
 
 export interface MesDisponible {
   mes: number;
@@ -75,7 +59,9 @@ export function useAnalyticsData(
   anio: number | null,
 ) {
   const [data, setData] = useState<AnalyticsData | null>(null);
-  const [mesesDisponibles, setMesesDisponibles] = useState<MesDisponible[]>([]);
+  const [mesesDisponibles, setMesesDisponibles] = useState<MesDisponible[]>(
+    [],
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -114,9 +100,10 @@ export function useAnalyticsData(
           .order('mes', { ascending: false })
           .order('fecha', { ascending: false });
 
-        const filteredEvaluacionesQuery = mes && anio
-          ? evaluacionesQuery.eq('mes', mes).eq('anio', anio)
-          : evaluacionesQuery;
+        const filteredEvaluacionesQuery =
+          mes && anio
+            ? evaluacionesQuery.eq('mes', mes).eq('anio', anio)
+            : evaluacionesQuery;
 
         const [evaluacionesResult, mesesResult] = await Promise.all([
           filteredEvaluacionesQuery,
@@ -133,7 +120,11 @@ export function useAnalyticsData(
         }
 
         if (evaluacionesResult.error || mesesResult.error) {
-          setError(evaluacionesResult.error?.message ?? mesesResult.error?.message ?? 'Error cargando analíticas');
+          setError(
+            evaluacionesResult.error?.message ??
+              mesesResult.error?.message ??
+              'Error cargando analiticas',
+          );
           return;
         }
 
@@ -148,38 +139,54 @@ export function useAnalyticsData(
           monthMap.set(key, {
             mes: row.mes,
             anio: row.anio,
-            label: `${MESES[row.mes - 1]} ${row.anio}`,
+            label: formatMonthYear(row.mes, row.anio) ?? String(row.anio),
             count: (previous?.count ?? 0) + 1,
           });
         }
 
         const orderedMonths = Array.from(monthMap.values()).sort(
-          (left, right) => right.anio - left.anio || right.mes - left.mes,
+          (left, right) =>
+            right.anio - left.anio || right.mes - left.mes,
         );
         setMesesDisponibles(orderedMonths);
 
-        const evaluaciones = (evaluacionesResult.data ?? []) as unknown as EvaluacionAnalyticsRow[];
+        const evaluaciones =
+          (evaluacionesResult.data ?? []) as unknown as EvaluacionAnalyticsRow[];
         if (evaluaciones.length === 0) {
           setData(null);
           return;
         }
 
         const totalEvaluaciones = evaluaciones.length;
-        const adheridos = evaluaciones.filter((evaluacion) => evaluacion.aprobacion_terapia === true).length;
-        const noAdheridos = evaluaciones.filter((evaluacion) => evaluacion.aprobacion_terapia === false).length;
-        const cultivos = evaluaciones.filter((evaluacion) => evaluacion.cultivos_previos === true).length;
-        const empirica = evaluaciones.filter((evaluacion) => evaluacion.terapia_empirica === true).length;
+        const adheridos = evaluaciones.filter(
+          (evaluacion) => evaluacion.aprobacion_terapia === true,
+        ).length;
+        const noAdheridos = evaluaciones.filter(
+          (evaluacion) => evaluacion.aprobacion_terapia === false,
+        ).length;
+        const cultivos = evaluaciones.filter(
+          (evaluacion) => evaluacion.cultivos_previos === true,
+        ).length;
+        const empirica = evaluaciones.filter(
+          (evaluacion) => evaluacion.terapia_empirica === true,
+        ).length;
 
         const conductaMap = new Map<string, number>();
         for (const evaluacion of evaluaciones) {
           const conducta = evaluacion.conducta_general ?? 'Sin registrar';
-          conductaMap.set(conducta, (conductaMap.get(conducta) ?? 0) + 1);
+          conductaMap.set(
+            conducta,
+            (conductaMap.get(conducta) ?? 0) + 1,
+          );
         }
 
         const servicioMap = new Map<string, number>();
         for (const evaluacion of evaluaciones) {
           const servicio = evaluacion.servicio ?? 'Sin registrar';
-          servicioMap.set(servicio, (servicioMap.get(servicio) ?? 0) + 1);
+          servicioMap.set(
+            servicio,
+            (servicioMap.get(servicio) ?? 0) + 1,
+          );
         }
 
         const tipoMap = new Map<string, number>();
@@ -190,13 +197,17 @@ export function useAnalyticsData(
 
         let periodoLabel = 'Todos los datos';
         if (mes && anio) {
-          periodoLabel = `${MESES[mes - 1]} ${anio}`;
+          periodoLabel = formatMonthYear(mes, anio) ?? 'Todos los datos';
         } else if (orderedMonths.length > 0) {
           periodoLabel = orderedMonths[0].label;
         } else if (evaluaciones[0]?.fecha) {
           const parsedDate = new Date(evaluaciones[0].fecha);
           if (!Number.isNaN(parsedDate.getTime())) {
-            periodoLabel = `${MESES[parsedDate.getMonth()]} ${parsedDate.getFullYear()}`;
+            periodoLabel =
+              formatMonthYear(
+                parsedDate.getMonth() + 1,
+                parsedDate.getFullYear(),
+              ) ?? 'Todos los datos';
           }
         }
 
@@ -221,14 +232,14 @@ export function useAnalyticsData(
           tipoData: Array.from(tipoMap.entries())
             .map(([tipo, count]) => ({
               tipo,
-              label: TIPO_LABELS[tipo] ?? tipo,
+              label: PROA_INTERVENTION_TYPE_LABELS[tipo] ?? tipo,
               count,
             }))
             .sort((left, right) => right.count - left.count),
         });
       } catch {
         if (!cancellation?.cancelled) {
-          setError('Error cargando analíticas');
+          setError('Error cargando analiticas');
         }
       } finally {
         if (!cancellation?.cancelled) {
