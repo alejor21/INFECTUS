@@ -18,6 +18,8 @@ import { callAI } from '../../lib/ai/aiClient';
 import { processAndSaveExcel } from '../../modules/excel/excelProcessor';
 import type { MonthMetrics, HospitalMonthlyMetric, HospitalExcelUpload } from '../../modules/excel/excelProcessor';
 import { useAuth } from '../../contexts/AuthContext';
+import { ALLOWED_EXCEL_EXTENSIONS_LABEL, MAX_EXCEL_UPLOAD_SIZE_BYTES } from '../../lib/constants';
+import { validateExcelFile } from '../../utils/fileValidation';
 
 const COLORS = [
   '#0D9488', '#3B82F6', '#EF4444', '#F59E0B', '#10B981',
@@ -65,6 +67,10 @@ const MONTH_NAMES = [
   'Noviembre',
   'Diciembre',
 ];
+
+function getUploadLimitLabel(): string {
+  return `${Math.round(MAX_EXCEL_UPLOAD_SIZE_BYTES / (1024 * 1024))} MB`;
+}
 
 function parseEvaluationMonth(row: EvaluationMetricRow): { year: number; month: number } | null {
   if (row.anio && row.mes) {
@@ -246,6 +252,9 @@ function EmptyState({ onUpload }: { onUpload: (f: File) => void }) {
       <p className="text-sm text-gray-500 dark:text-gray-400 max-w-sm mb-6">
         Este hospital aún no tiene datos. Sube un Excel para ver métricas, gráficos y análisis IA.
       </p>
+      <p className="text-xs text-gray-400 dark:text-gray-500 max-w-sm mb-6">
+        Formatos permitidos: {ALLOWED_EXCEL_EXTENSIONS_LABEL}. TamaÃ±o mÃ¡ximo: {getUploadLimitLabel()}.
+      </p>
       <button
         onClick={() => inputRef.current?.click()}
         className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-all duration-200 shadow-sm hover:shadow-md min-h-[44px]"
@@ -256,7 +265,7 @@ function EmptyState({ onUpload }: { onUpload: (f: File) => void }) {
       <input
         ref={inputRef}
         type="file"
-        accept=".xlsx,.xls,.csv"
+        accept=".xlsx,.xls"
         className="hidden"
         onChange={(e) => { if (e.target.files?.[0]) onUpload(e.target.files[0]); }}
       />
@@ -468,6 +477,13 @@ export function HospitalDashboard() {
 
   const handleExcelFile = async (file: File) => {
     if (!hospitalId || !user) return;
+
+    const validationError = validateExcelFile(file);
+    if (validationError) {
+      toast.error(validationError);
+      return;
+    }
+
     setUploadingExcel(true);
     toast.info('Procesando Excel...');
     const result = await processAndSaveExcel(hospitalId, file, user.id);
@@ -639,7 +655,7 @@ Responde en español, tono profesional médico.`;
       <input
         ref={updateRef}
         type="file"
-        accept=".xlsx,.xls,.csv"
+        accept=".xlsx,.xls"
         className="hidden"
         onChange={(e) => { if (e.target.files?.[0]) handleExcelFile(e.target.files[0]); }}
       />

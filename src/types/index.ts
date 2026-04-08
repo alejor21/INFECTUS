@@ -1,4 +1,5 @@
 export interface InterventionRecord {
+  hospitalId?: string;
   fecha: string;
   tipoIntervencion: string;
   nombre: string;

@@ -154,7 +154,11 @@ export function HospitalProvider({ children }: { children: React.ReactNode }) {
   const records = useMemo(() => {
     let filtered = allRawRecords;
     if (selectedHospitalObj) {
-      filtered = filtered.filter((r) => r.hospitalName === selectedHospitalObj.name);
+      filtered = filtered.filter((record) =>
+        record.hospitalId
+          ? record.hospitalId === selectedHospitalObj.id
+          : record.hospitalName === selectedHospitalObj.name,
+      );
     }
     return applyDateRange(filtered, dateRange);
   }, [allRawRecords, selectedHospitalObj, dateRange]);

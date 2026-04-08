@@ -4,16 +4,16 @@ import { PageLoader } from '../../components/PageLoader';
 import { Login } from '../pages/Login';
 
 export function ProtectedRoute() {
-  const { user, loading } = useAuth();
+  const { user, profile, loading } = useAuth();
 
   if (loading) return <PageLoader />;
-  if (!user) return <Navigate to="/login" replace />;
+  if (!user || !profile?.is_active) return <Navigate to="/login" replace />;
   return <Outlet />;
 }
 
 export function LoginRoute() {
-  const { user, loading } = useAuth();
+  const { user, profile, loading } = useAuth();
   if (loading) return <PageLoader />;
-  if (user) return <Navigate to="/dashboard" replace />;
+  if (user && profile?.is_active) return <Navigate to="/dashboard" replace />;
   return <Login />;
 }

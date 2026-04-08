@@ -133,7 +133,11 @@ export function useProaCharts({
       return evaluaciones;
     }
 
-    return evaluaciones.filter((record) => record.hospitalName === selectedHospital.name);
+    return evaluaciones.filter((record) =>
+      record.hospitalId
+        ? record.hospitalId === selectedHospital.id
+        : record.hospitalName === selectedHospital.name,
+    );
   }, [evaluaciones, hospitalId, hospitals]);
 
   const adherenciaData = useMemo<AdherenciaChartData>(() => {

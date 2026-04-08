@@ -101,7 +101,11 @@ export function Comparativa() {
     for (const hospital of selectedHospitals) {
       map.set(
         hospital.id,
-        dateFilteredRecords.filter((r) => r.hospitalName === hospital.name),
+        dateFilteredRecords.filter((record) =>
+          record.hospitalId
+            ? record.hospitalId === hospital.id
+            : record.hospitalName === hospital.name,
+        ),
       );
     }
     return map;

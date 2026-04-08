@@ -15,7 +15,7 @@ import { useNavigate } from 'react-router';
 import { useHospitalContext } from '../../contexts/HospitalContext';
 import { useAuth, usePermissions } from '../../contexts/AuthContext';
 import {
-  updateHospital,
+  updateHospitalWithReferences,
   deleteHospital,
   saveHospitalFile,
   deleteHospitalFileData,
@@ -30,6 +30,7 @@ import { getCurrentMonthValue } from '../../lib/analytics/proaPeriods';
 import { EmptyState } from '../components/EmptyState';
 import { ProaReportModal } from '../components/ProaReportModal';
 import { InfoTooltip } from '../components/Tooltip';
+import { validateExcelFile } from '../../utils/fileValidation';
 
 const MONTH_NAMES = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -307,6 +308,14 @@ export function Hospitales() {
       return;
     }
 
+    if (addExcelFile) {
+      const fileError = validateExcelFile(addExcelFile);
+      if (fileError) {
+        setAddError(fileError);
+        return;
+      }
+    }
+
     setAddSaving(true);
     setAddError('');
 
@@ -381,7 +390,7 @@ export function Hospitales() {
     setEditError('');
 
     try {
-      const { error } = await updateHospital(activeHospital.id, {
+      const { data, error } = await updateHospitalWithReferences(activeHospital, {
         name: editName.trim(),
         city: editCity.trim(),
         department: editDept.trim(),
@@ -397,7 +406,7 @@ export function Hospitales() {
       }
 
       setEditSaved(true);
-      setActiveHospital({
+      setActiveHospital(data ?? {
         ...activeHospital,
         name: editName.trim(),
         city: editCity.trim(),
@@ -438,10 +447,12 @@ export function Hospitales() {
   const addPendingFiles = (files: FileList | File[]) => {
     const now = new Date();
     const incomingFiles = Array.from(files);
-    const invalidFiles = incomingFiles.filter((file) => !/\.(xlsx|xls|csv)$/i.test(file.name));
+    const validationErrors = incomingFiles
+      .map((file) => validateExcelFile(file))
+      .filter((value): value is string => Boolean(value));
 
-    if (invalidFiles.length > 0) {
-      toast.error('Solo se permiten archivos Excel o CSV.');
+    if (validationErrors.length > 0) {
+      toast.error(validationErrors[0]);
     }
 
     const existingKeys = new Set(
@@ -449,7 +460,7 @@ export function Hospitales() {
     );
 
     const newItems: PendingFile[] = incomingFiles
-      .filter((file) => /\.(xlsx|xls|csv)$/i.test(file.name))
+      .filter((file) => !validateExcelFile(file))
       .filter((file) => {
         const fileKey = `${file.name}-${file.size}`;
         if (existingKeys.has(fileKey)) {
@@ -468,7 +479,7 @@ export function Hospitales() {
         message: '',
       }));
 
-    if (newItems.length === 0 && incomingFiles.length > 0 && invalidFiles.length !== incomingFiles.length) {
+    if (newItems.length === 0 && incomingFiles.length > 0 && validationErrors.length !== incomingFiles.length) {
       toast.error('Esos archivos ya estaban en la cola.');
       return;
     }
@@ -557,7 +568,6 @@ export function Hospitales() {
 
     const { error } = await deleteHospitalFileData(
       activeHospital.id,
-      activeHospital.name,
       fileId,
       f.month,
       f.year,
@@ -580,6 +590,13 @@ export function Hospitales() {
       toast.error('Debes iniciar sesion para actualizar archivos Excel.');
       return;
     }
+
+    const validationError = validateExcelFile(file);
+    if (validationError) {
+      toast.error(validationError);
+      return;
+    }
+
     setUpdatingExcelId(hospitalId);
     toast.info('Procesando Excel...');
     const result = await processAndSaveExcel(hospitalId, file, user.id);
@@ -751,9 +768,25 @@ export function Hospitales() {
               <input
                 ref={addExcelRef}
                 type="file"
-                accept=".xlsx,.xls,.csv"
+                accept=".xlsx,.xls"
                 className="hidden"
-                onChange={(e) => setAddExcelFile(e.target.files?.[0] ?? null)}
+                onChange={(e) => {
+                  const file = e.target.files?.[0] ?? null;
+                  if (!file) {
+                    setAddExcelFile(null);
+                    return;
+                  }
+
+                  const validationError = validateExcelFile(file);
+                  if (validationError) {
+                    toast.error(validationError);
+                    setAddExcelFile(null);
+                    e.target.value = '';
+                    return;
+                  }
+
+                  setAddExcelFile(file);
+                }}
               />
             </div>
 
@@ -907,7 +940,7 @@ export function Hospitales() {
       <input
         ref={updateExcelRef}
         type="file"
-        accept=".xlsx,.xls,.csv"
+        accept=".xlsx,.xls"
         className="hidden"
         onChange={(e) => {
           const file = e.target.files?.[0];
@@ -1180,7 +1213,7 @@ export function Hospitales() {
             <input
               ref={fileInputRef}
               type="file"
-              accept=".xlsx,.xls,.csv"
+              accept=".xlsx,.xls"
               multiple
               className="hidden"
               onChange={(e) => { if (e.target.files) addPendingFiles(e.target.files); }}

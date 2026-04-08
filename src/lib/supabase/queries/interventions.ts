@@ -10,6 +10,7 @@ type DbRow = Record<string, string | null>;
 /** Maps a camelCase InterventionRecord to a snake_case DB row. */
 function toDbRow(record: InterventionRecord): DbRow {
   return {
+    hospital_id:                record.hospitalId ?? null,
     hospital_name:              record.hospitalName ?? '',
     fecha:                      record.fecha,
     tipo_intervencion:          record.tipoIntervencion,
@@ -52,6 +53,7 @@ function toDbRow(record: InterventionRecord): DbRow {
 /** Maps a snake_case DB row back to a camelCase InterventionRecord. */
 function fromDbRow(row: DbRow): InterventionRecord {
   return {
+    hospitalId:                 row['hospital_id'] ?? undefined,
     id:                         row['id'] ?? undefined,
     createdAt:                  row['created_at'] ?? undefined,
     hospitalName:               row['hospital_name'] ?? undefined,
@@ -197,14 +199,14 @@ export async function getHospitalsWithStats(): Promise<
  * Returns the number of rows deleted and any error message.
  */
 export async function deleteHospitalData(
-  hospitalName: string,
+  hospitalId: string,
 ): Promise<{ success: boolean; deleted: number; error: string | null }> {
   const supabase = getSupabaseClient();
 
   const { error, count } = await supabase
     .from('interventions')
     .delete({ count: 'exact' })
-    .eq('hospital_name', hospitalName);
+    .eq('hospital_id', hospitalId);
 
   if (error) {
     return { success: false, deleted: 0, error: error.message };

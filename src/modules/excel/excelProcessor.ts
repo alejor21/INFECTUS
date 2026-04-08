@@ -2,6 +2,8 @@ import * as XLSX from 'xlsx';
 import { getSupabaseClient } from '../../lib/supabase/client';
 import { parseInterventionFile } from '../../lib/parsers/excelParser';
 import { upsertInterventions } from '../../lib/supabase/queries/interventions';
+import { validateExcelFile } from '../../utils/fileValidation';
+import { sanitizeOptionalText } from '../../utils/sanitization';
 
 const SPANISH_MONTHS: Record<string, number> = {
   enero: 1,
@@ -328,16 +330,7 @@ function buildColumnIndex(headers: unknown[]): Record<string, number> {
 }
 
 function cleanString(value: unknown): string | null {
-  if (value === null || value === undefined) {
-    return null;
-  }
-
-  const cleaned = String(value).trim();
-  if (cleaned === '') {
-    return null;
-  }
-
-  return cleaned;
+  return sanitizeOptionalText(value);
 }
 
 function parseInteger(value: unknown): number | null {
@@ -959,6 +952,21 @@ export async function processAndSaveExcel(
   uploadedBy: string,
 ): Promise<ProcessResult> {
   try {
+    const validationError = validateExcelFile(file);
+    if (validationError) {
+      return {
+        success: false,
+        monthsFound: [],
+        totalRows: 0,
+        filasInsertadas: 0,
+        filasConError: 0,
+        mesesDetectados: [],
+        replacedMonths: [],
+        errores: [],
+        error: validationError,
+      };
+    }
+
     const supabase = getSupabaseClient();
     const { data: hospitalRow, error: hospitalError } = await supabase
       .from('hospitals')
@@ -984,6 +992,7 @@ export async function processAndSaveExcel(
     if (parsedInterventions.valid.length > 0) {
       const recordsWithHospital = parsedInterventions.valid.map((record) => ({
         ...record,
+        hospitalId,
         hospitalName: hospitalRow.name,
       }));
 

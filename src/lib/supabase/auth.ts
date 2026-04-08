@@ -106,8 +106,16 @@ export const updateCurrentUserMetadata = (data: Record<string, unknown>) =>
 export const signOut = () => getSupabaseClient().auth.signOut();
 
 export const getProfile = async (userId: string) => {
-  const { data } = await getSupabaseClient().from('profiles').select('*').eq('id', userId).single();
-  return data;
+  const { data, error } = await getSupabaseClient().from('profiles').select('*').eq('id', userId).single();
+  if (error) {
+    if (error.code === 'PGRST116') {
+      return null;
+    }
+
+    throw error;
+  }
+
+  return data ?? null;
 };
 
 export const getAllProfiles = async () => {

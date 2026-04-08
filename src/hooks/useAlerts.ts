@@ -29,7 +29,11 @@ function generateAutoAlerts(
   const hospitalsToCheck = selectedHospitalObj ? [selectedHospitalObj] : hospitals;
 
   for (const hospital of hospitalsToCheck) {
-    const hospitalRecords = records.filter((record) => record.hospitalName === hospital.name);
+    const hospitalRecords = records.filter((record) =>
+      record.hospitalId
+        ? record.hospitalId === hospital.id
+        : record.hospitalName === hospital.name,
+    );
     if (hospitalRecords.length === 0) {
       continue;
     }

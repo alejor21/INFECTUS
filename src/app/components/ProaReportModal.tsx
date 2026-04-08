@@ -98,9 +98,12 @@ export function ProaReportModal({
 
     const fallbackHospitalId = selectedHospitalObj?.id ?? hospitals[0]?.id ?? '';
     const nextHospitalId = initialHospitalId ?? fallbackHospitalId;
-    const nextHospitalName = hospitals.find((hospital) => hospital.id === nextHospitalId)?.name ?? null;
-    const sourceForLatestMonth = nextHospitalName
-      ? allRawRecords.filter((record) => record.hospitalName === nextHospitalName)
+    const sourceForLatestMonth = nextHospitalId
+      ? allRawRecords.filter((record) =>
+        record.hospitalId
+          ? record.hospitalId === nextHospitalId
+          : record.hospitalName === hospitals.find((hospital) => hospital.id === nextHospitalId)?.name,
+      )
       : allRawRecords;
 
     setSelectedHospitalId(nextHospitalId);
@@ -146,7 +149,11 @@ export function ProaReportModal({
       return [];
     }
 
-    return monthRecords.filter((record) => record.hospitalName === selectedHospitalName);
+    return monthRecords.filter((record) =>
+      record.hospitalId
+        ? record.hospitalId === effectiveHospitalId
+        : record.hospitalName === selectedHospitalName,
+    );
   }, [effectiveHospitalId, monthRecords, selectedHospitalName]);
 
   const { adherenciaData, conductasData, servicioData, tipoData, isLoading, isEmpty } = useProaCharts({

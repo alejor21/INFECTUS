@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { getSupabaseClient } from '../lib/supabase/client';
 import { getProfile } from '../lib/supabase/auth';
@@ -31,63 +31,109 @@ export const AuthContext = createContext<AuthContextType>({
   refreshProfile: async () => {},
 });
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const refreshProfile = async () => {
-    const sessionUser = getSupabaseClient().auth.getUser
-      ? (await getSupabaseClient().auth.getUser()).data.user
-      : user;
+  const loadActiveProfile = useCallback(async (sessionUser: User | null): Promise<Profile | null> => {
+    if (!sessionUser) {
+      return null;
+    }
+
+    const profileData = await getProfile(sessionUser.id);
+    return profileData?.is_active ? profileData : null;
+  }, []);
+
+  const clearSession = useCallback(async () => {
+    setUser(null);
+    setProfile(null);
+    await getSupabaseClient().auth.signOut();
+  }, []);
+
+  const refreshProfile = useCallback(async () => {
+    const {
+      data: { user: sessionUser },
+    } = await getSupabaseClient().auth.getUser();
 
     if (!sessionUser) {
+      setUser(null);
       setProfile(null);
       return;
     }
 
-    const profileData = await getProfile(sessionUser.id);
+    const profileData = await loadActiveProfile(sessionUser);
+    if (!profileData) {
+      await clearSession();
+      return;
+    }
+
+    setUser(sessionUser);
     setProfile(profileData);
-  };
+  }, [clearSession, loadActiveProfile]);
 
   useEffect(() => {
     const supabase = getSupabaseClient();
     let isMounted = true;
 
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!isMounted) return;
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        getProfile(session.user.id).then((profileData) => {
-          if (isMounted) setProfile(profileData);
-        });
+    const resolveSession = async (sessionUser: User | null) => {
+      if (!sessionUser) {
+        if (isMounted) {
+          setUser(null);
+          setProfile(null);
+        }
+        return;
       }
-      setLoading(false);
-    }).catch(() => {
-      if (isMounted) setLoading(false);
-    });
 
-    // Listen for auth changes
+      const profileData = await loadActiveProfile(sessionUser);
+      if (!profileData) {
+        await clearSession();
+        return;
+      }
+
+      if (isMounted) {
+        setUser(sessionUser);
+        setProfile(profileData);
+      }
+    };
+
+    void supabase.auth.getSession()
+      .then(async ({ data: { session } }) => {
+        await resolveSession(session?.user ?? null);
+      })
+      .catch(async () => {
+        await clearSession();
+      })
+      .finally(() => {
+        if (isMounted) {
+          setLoading(false);
+        }
+      });
+
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!isMounted) return;
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        getProfile(session.user.id).then((profileData) => {
-          if (isMounted) setProfile(profileData);
-        });
-      } else {
-        setProfile(null);
+      if (!isMounted) {
+        return;
       }
+
+      setLoading(true);
+      void resolveSession(session?.user ?? null)
+        .catch(async () => {
+          await clearSession();
+        })
+        .finally(() => {
+          if (isMounted) {
+            setLoading(false);
+          }
+        });
     });
 
     return () => {
       isMounted = false;
       subscription.unsubscribe();
     };
-  }, []);
+  }, [clearSession, loadActiveProfile]);
 
   return (
     <AuthContext.Provider

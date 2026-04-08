@@ -11,6 +11,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { getAllProfiles, inviteUser, updateCurrentUserMetadata, updatePassword, updateProfile } from '../../lib/supabase/auth';
 import { updateHospitalWithReferences } from '../../lib/supabase/hospitals';
 import { resetWelcome } from '../components/WelcomeModal';
+import { MAX_AVATAR_SIZE_BYTES } from '../../lib/constants';
 
 type UserRole = Profile['role'];
 type ThemePreference = 'light' | 'dark';
@@ -190,7 +191,7 @@ export function Configuracion() {
       toast.error('Selecciona una imagen válida para el avatar.');
       return;
     }
-    if (file.size > 400 * 1024) {
+    if (file.size > MAX_AVATAR_SIZE_BYTES) {
       toast.error('La imagen debe pesar menos de 400 KB.');
       return;
     }

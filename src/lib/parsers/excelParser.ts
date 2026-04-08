@@ -1,6 +1,8 @@
 import * as XLSX from 'xlsx';
 import { interventionSchema } from '../validators/interventionSchema';
 import type { InterventionRecord } from '../../types';
+import { validateExcelFile } from '../../utils/fileValidation';
+import { sanitizeOptionalText } from '../../utils/sanitization';
 
 export interface ParseResult {
   valid: InterventionRecord[];
@@ -186,11 +188,7 @@ function canonicalize(value: string): string {
 }
 
 function cleanString(value: unknown): string | null {
-  if (value === null || value === undefined) {
-    return null;
-  }
-
-  const text = String(value).trim();
+  const text = sanitizeOptionalText(value);
   if (!text) {
     return null;
   }
@@ -383,6 +381,11 @@ function resolveHeader(header: string): ImportField | undefined {
 }
 
 async function readFileAsRows(file: File): Promise<Record<string, unknown>[]> {
+  const validationError = validateExcelFile(file);
+  if (validationError) {
+    throw new Error(validationError);
+  }
+
   const buffer = await file.arrayBuffer();
   const workbook = XLSX.read(buffer, {
     type: 'array',

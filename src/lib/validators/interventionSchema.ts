@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 export const interventionSchema = z.object({
   // Required fields
+  hospitalId: z.string().optional(),
   fecha: z.string().min(1, 'La fecha es requerida'),
   servicio: z.string().min(1, 'El servicio es requerido'),
 

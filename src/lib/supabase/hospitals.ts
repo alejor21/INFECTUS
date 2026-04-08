@@ -201,7 +201,6 @@ export const getHospitalUploadStatuses = async (
 
 export const deleteHospitalFileData = async (
   hospitalId: string,
-  hospitalName: string,
   fileId: string,
   month: number,
   year: number,
@@ -214,12 +213,12 @@ export const deleteHospitalFileData = async (
     supabase
       .from('interventions')
       .delete()
-      .eq('hospital_name', hospitalName)
+      .eq('hospital_id', hospitalId)
       .like('fecha', `__/${monthPad}/${year}`),
     supabase
       .from('interventions')
       .delete()
-      .eq('hospital_name', hospitalName)
+      .eq('hospital_id', hospitalId)
       .like('fecha', `${monthKey}-%`),
     supabase
       .from('evaluaciones')

@@ -2,11 +2,12 @@ import { useState, useCallback } from 'react';
 import { parseInterventionFile, type ParseResult } from '../lib/parsers/excelParser';
 import { upsertInterventions } from '../lib/supabase/queries/interventions';
 import type { UploadResult } from '../types';
+import { validateExcelFile } from '../utils/fileValidation';
 
 export type UploadStatus = 'idle' | 'parsing' | 'uploading' | 'success' | 'error';
 
 export interface UseFileUploadReturn {
-  uploadFile: (file: File, hospitalName: string) => Promise<UploadResult>;
+  uploadFile: (file: File, hospitalName: string, hospitalId?: string) => Promise<UploadResult>;
   status: UploadStatus;
   result: UploadResult | null;
   parseResult: ParseResult | null;
@@ -20,11 +21,20 @@ export function useFileUpload(): UseFileUploadReturn {
   const [error, setError] = useState<string | null>(null);
 
   const uploadFile = useCallback(
-    async (file: File, hospitalName: string): Promise<UploadResult> => {
+    async (file: File, hospitalName: string, hospitalId?: string): Promise<UploadResult> => {
       setStatus('parsing');
       setResult(null);
       setParseResult(null);
       setError(null);
+
+      const validationError = validateExcelFile(file);
+      if (validationError) {
+        setError(validationError);
+        setStatus('error');
+        const failResult: UploadResult = { inserted: 0, skipped: 0, errors: [{ row: 0, message: validationError }] };
+        setResult(failResult);
+        return failResult;
+      }
 
       // 1. Parse the file
       let parsed: ParseResult;
@@ -54,7 +64,7 @@ export function useFileUpload(): UseFileUploadReturn {
       }
 
       // 2. Attach hospitalName to every record
-      const recordsWithHospital = valid.map((r) => ({ ...r, hospitalName }));
+      const recordsWithHospital = valid.map((r) => ({ ...r, hospitalId, hospitalName }));
 
       // 3. Upload to Supabase
       setStatus('uploading');
