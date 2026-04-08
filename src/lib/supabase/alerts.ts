@@ -1,5 +1,19 @@
 import { getSupabaseClient } from './client';
 
+const ALERT_SELECT_COLUMNS = [
+  'id',
+  'hospital_id',
+  'hospital_name',
+  'type',
+  'severity',
+  'title',
+  'message',
+  'metric_value',
+  'threshold_value',
+  'is_read',
+  'created_at',
+].join(', ');
+
 export interface Alert {
   id: string;
   hospital_id: string | null;
@@ -18,28 +32,66 @@ export const getAlerts = async (hospitalId?: string): Promise<Alert[]> => {
   const supabase = getSupabaseClient();
   let query = supabase
     .from('alerts')
-    .select('*')
+    .select(ALERT_SELECT_COLUMNS)
     .order('created_at', { ascending: false });
-  if (hospitalId) query = query.eq('hospital_id', hospitalId);
-  const { data } = await query;
-  return data ?? [];
+
+  if (hospitalId) {
+    query = query.eq('hospital_id', hospitalId);
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []) as unknown as Alert[];
 };
 
-export const markAlertRead = async (id: string) => {
-  return getSupabaseClient().from('alerts').update({ is_read: true }).eq('id', id);
+export const markAlertRead = async (id: string): Promise<void> => {
+  const { error } = await getSupabaseClient()
+    .from('alerts')
+    .update({ is_read: true })
+    .eq('id', id);
+
+  if (error) {
+    throw error;
+  }
 };
 
-export const markAllAlertsRead = async (hospitalId?: string) => {
+export const markAllAlertsRead = async (hospitalId?: string): Promise<void> => {
   const supabase = getSupabaseClient();
-  let query = supabase.from('alerts').update({ is_read: true }).eq('is_read', false);
-  if (hospitalId) query = query.eq('hospital_id', hospitalId);
-  return query;
+  let query = supabase
+    .from('alerts')
+    .update({ is_read: true })
+    .eq('is_read', false);
+
+  if (hospitalId) {
+    query = query.eq('hospital_id', hospitalId);
+  }
+
+  const { error } = await query;
+  if (error) {
+    throw error;
+  }
 };
 
-export const deleteAlert = async (id: string) => {
-  return getSupabaseClient().from('alerts').delete().eq('id', id);
+export const deleteAlert = async (id: string): Promise<void> => {
+  const { error } = await getSupabaseClient()
+    .from('alerts')
+    .delete()
+    .eq('id', id);
+
+  if (error) {
+    throw error;
+  }
 };
 
-export const saveAlert = async (alert: Omit<Alert, 'id' | 'created_at'>) => {
-  return getSupabaseClient().from('alerts').insert(alert);
+export const saveAlert = async (
+  alert: Omit<Alert, 'id' | 'created_at'>,
+): Promise<void> => {
+  const { error } = await getSupabaseClient().from('alerts').insert(alert);
+
+  if (error) {
+    throw error;
+  }
 };
