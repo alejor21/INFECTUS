@@ -10,8 +10,7 @@ export interface AIResponse {
 
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
-
-const RETRIABLE_STATUSES = new Set([429, 402, 503, 500]);
+const DEFAULT_AI_ERROR = 'AI service temporarily unavailable';
 
 async function parseContent(res: Response): Promise<string> {
   const data = (await res.json()) as {
@@ -25,9 +24,11 @@ export async function callAI(
   options?: { model?: string; maxTokens?: number },
 ): Promise<AIResponse> {
   const maxTokens = options?.maxTokens ?? 1024;
-
-  // 1 — Try Groq
   const groqKey = import.meta.env.VITE_GROQ_API_KEY as string | undefined;
+  const openRouterKey = import.meta.env.VITE_OPENROUTER_API_KEY as
+    | string
+    | undefined;
+
   if (groqKey) {
     try {
       const res = await fetch(GROQ_URL, {
@@ -42,27 +43,23 @@ export async function callAI(
           max_tokens: maxTokens,
         }),
       });
+
       if (res.ok) {
         return { content: await parseContent(res), provider: 'groq' };
       }
-      if (!RETRIABLE_STATUSES.has(res.status)) {
-        throw new Error(`Groq error: ${res.status}`);
+
+      if (!openRouterKey) {
+        throw new Error(DEFAULT_AI_ERROR);
       }
-      // Fall through to OpenRouter on retriable status
-    } catch (err) {
-      // Only rethrow non-retriable errors
-      if (err instanceof Error && !err.message.startsWith('Groq error')) {
-        // Network error — fall through
-      } else if (err instanceof Error && !RETRIABLE_STATUSES.has(Number(err.message.split(': ')[1]))) {
-        throw err;
+    } catch {
+      if (!openRouterKey) {
+        throw new Error(DEFAULT_AI_ERROR);
       }
     }
   }
 
-  // 2 — Try OpenRouter fallback
-  const openRouterKey = import.meta.env.VITE_OPENROUTER_API_KEY as string | undefined;
   if (!openRouterKey) {
-    throw new Error('AI service temporarily unavailable');
+    throw new Error(DEFAULT_AI_ERROR);
   }
 
   const res = await fetch(OPENROUTER_URL, {
@@ -84,5 +81,5 @@ export async function callAI(
     return { content: await parseContent(res), provider: 'openrouter' };
   }
 
-  throw new Error('AI service temporarily unavailable');
+  throw new Error(DEFAULT_AI_ERROR);
 }
