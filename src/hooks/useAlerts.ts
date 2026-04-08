@@ -4,6 +4,7 @@ import { useHospitalContext } from '../contexts/HospitalContext';
 import {
   deleteAlert as deleteAlertFromDb,
   getAlerts,
+  getUnreadAlertCount,
   markAlertRead,
   markAllAlertsRead,
   saveAlert,
@@ -21,6 +22,10 @@ const ALERTS_UPDATE_ERROR =
   'No se pudo actualizar la alerta. Intenta nuevamente.';
 const ALERTS_DELETE_ERROR =
   'No se pudo eliminar la alerta. Intenta nuevamente.';
+const ALL_HOSPITALS_KEY = '__all_hospitals__';
+
+const unreadCountCache = new Map<string, number>();
+const unreadCountRequests = new Map<string, Promise<number>>();
 
 const CARBAPENEMS = ['Meropenem', 'Imipenem', 'Ertapenem', 'Doripenem'];
 
@@ -29,6 +34,49 @@ const pct = (numerator: number, denominator: number): number =>
 
 function isYes(value: string | undefined): boolean {
   return (value ?? '').trim().toUpperCase() === 'SI';
+}
+
+function getAlertScopeKey(hospitalId?: string): string {
+  return hospitalId ?? ALL_HOSPITALS_KEY;
+}
+
+function getUnreadCountFromAlerts(alerts: Alert[]): number {
+  return alerts.filter((alert) => !alert.is_read).length;
+}
+
+function setCachedUnreadCount(
+  hospitalId: string | undefined,
+  count: number,
+): void {
+  unreadCountCache.set(getAlertScopeKey(hospitalId), count);
+}
+
+async function getCachedUnreadCount(
+  hospitalId?: string,
+  forceRefresh = false,
+): Promise<number> {
+  const cacheKey = getAlertScopeKey(hospitalId);
+
+  if (!forceRefresh && unreadCountCache.has(cacheKey)) {
+    return unreadCountCache.get(cacheKey) ?? 0;
+  }
+
+  const inflightRequest = unreadCountRequests.get(cacheKey);
+  if (inflightRequest) {
+    return inflightRequest;
+  }
+
+  const request = getUnreadAlertCount(hospitalId)
+    .then((count) => {
+      unreadCountCache.set(cacheKey, count);
+      return count;
+    })
+    .finally(() => {
+      unreadCountRequests.delete(cacheKey);
+    });
+
+  unreadCountRequests.set(cacheKey, request);
+  return request;
 }
 
 function notifyAlertsUpdated(): void {
@@ -136,6 +184,7 @@ function generateAutoAlerts(
 export function useAlerts() {
   const { selectedHospitalObj, allRawRecords, hospitals } =
     useHospitalContext();
+  const hospitalId = selectedHospitalObj?.id;
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -148,15 +197,16 @@ export function useAlerts() {
     setError(null);
 
     try {
-      const data = await getAlerts(selectedHospitalObj?.id);
+      const data = await getAlerts(hospitalId);
       setAlerts(data);
+      setCachedUnreadCount(hospitalId, getUnreadCountFromAlerts(data));
     } catch {
       setAlerts([]);
       setError(ALERTS_FETCH_ERROR);
     } finally {
       setLoading(false);
     }
-  }, [selectedHospitalObj?.id]);
+  }, [hospitalId]);
 
   useEffect(() => {
     void fetchAlerts();
@@ -181,38 +231,51 @@ export function useAlerts() {
     return () => window.clearTimeout(timer);
   }, [allRawRecords, hospitals, selectedHospitalObj, fetchAlerts]);
 
-  const unreadCount = alerts.filter((alert) => !alert.is_read).length;
+  const unreadCount = getUnreadCountFromAlerts(alerts);
 
-  const markRead = useCallback(async (id: string) => {
-    setMarkingAlertId(id);
-    setError(null);
+  const markRead = useCallback(
+    async (id: string) => {
+      setMarkingAlertId(id);
+      setError(null);
 
-    try {
-      await markAlertRead(id);
-      setAlerts((previousAlerts) =>
-        previousAlerts.map((alert) =>
-          alert.id === id ? { ...alert, is_read: true } : alert,
-        ),
-      );
-      notifyAlertsUpdated();
-      toast.success('Alerta marcada como leida.');
-    } catch {
-      setError(ALERTS_UPDATE_ERROR);
-      toast.error(ALERTS_UPDATE_ERROR);
-    } finally {
-      setMarkingAlertId(null);
-    }
-  }, []);
+      try {
+        await markAlertRead(id);
+        setAlerts((previousAlerts) => {
+          const nextAlerts = previousAlerts.map((alert) =>
+            alert.id === id ? { ...alert, is_read: true } : alert,
+          );
+          setCachedUnreadCount(
+            hospitalId,
+            getUnreadCountFromAlerts(nextAlerts),
+          );
+          return nextAlerts;
+        });
+        notifyAlertsUpdated();
+        toast.success('Alerta marcada como leida.');
+      } catch {
+        setError(ALERTS_UPDATE_ERROR);
+        toast.error(ALERTS_UPDATE_ERROR);
+      } finally {
+        setMarkingAlertId(null);
+      }
+    },
+    [hospitalId],
+  );
 
   const markAllRead = useCallback(async () => {
     setMarkingAllAsRead(true);
     setError(null);
 
     try {
-      await markAllAlertsRead(selectedHospitalObj?.id);
-      setAlerts((previousAlerts) =>
-        previousAlerts.map((alert) => ({ ...alert, is_read: true })),
-      );
+      await markAllAlertsRead(hospitalId);
+      setAlerts((previousAlerts) => {
+        const nextAlerts = previousAlerts.map((alert) => ({
+          ...alert,
+          is_read: true,
+        }));
+        setCachedUnreadCount(hospitalId, 0);
+        return nextAlerts;
+      });
       notifyAlertsUpdated();
       toast.success('Todas las alertas fueron marcadas como leidas.');
     } catch {
@@ -221,27 +284,37 @@ export function useAlerts() {
     } finally {
       setMarkingAllAsRead(false);
     }
-  }, [selectedHospitalObj?.id]);
+  }, [hospitalId]);
 
-  const removeAlert = useCallback(async (id: string) => {
-    setDeletingAlertId(id);
-    setError(null);
+  const removeAlert = useCallback(
+    async (id: string) => {
+      setDeletingAlertId(id);
+      setError(null);
 
-    try {
-      await deleteAlertFromDb(id);
-      setAlerts((previousAlerts) =>
-        previousAlerts.filter((alert) => alert.id !== id),
-      );
-      notifyAlertsUpdated();
-      toast.success('Alerta eliminada correctamente.');
-    } catch {
-      setError(ALERTS_DELETE_ERROR);
-      toast.error(ALERTS_DELETE_ERROR);
-      throw new Error(ALERTS_DELETE_ERROR);
-    } finally {
-      setDeletingAlertId(null);
-    }
-  }, []);
+      try {
+        await deleteAlertFromDb(id);
+        setAlerts((previousAlerts) => {
+          const nextAlerts = previousAlerts.filter(
+            (alert) => alert.id !== id,
+          );
+          setCachedUnreadCount(
+            hospitalId,
+            getUnreadCountFromAlerts(nextAlerts),
+          );
+          return nextAlerts;
+        });
+        notifyAlertsUpdated();
+        toast.success('Alerta eliminada correctamente.');
+      } catch {
+        setError(ALERTS_DELETE_ERROR);
+        toast.error(ALERTS_DELETE_ERROR);
+        throw new Error(ALERTS_DELETE_ERROR);
+      } finally {
+        setDeletingAlertId(null);
+      }
+    },
+    [hospitalId],
+  );
 
   return {
     alerts,
@@ -260,22 +333,26 @@ export function useAlerts() {
 
 export function useAlertBadge(): number {
   const { selectedHospitalObj } = useHospitalContext();
+  const hospitalId = selectedHospitalObj?.id;
   const [unreadCount, setUnreadCount] = useState(0);
 
-  const refreshUnreadCount = useCallback(async () => {
-    try {
-      const data = await getAlerts(selectedHospitalObj?.id);
-      setUnreadCount(data.filter((alert) => !alert.is_read).length);
-    } catch {
-      setUnreadCount(0);
-    }
-  }, [selectedHospitalObj?.id]);
+  const refreshUnreadCount = useCallback(
+    async (forceRefresh = false) => {
+      try {
+        const count = await getCachedUnreadCount(hospitalId, forceRefresh);
+        setUnreadCount(count);
+      } catch {
+        setUnreadCount(0);
+      }
+    },
+    [hospitalId],
+  );
 
   useEffect(() => {
     void refreshUnreadCount();
 
     const handleAlertsUpdated = () => {
-      void refreshUnreadCount();
+      void refreshUnreadCount(true);
     };
 
     window.addEventListener(ALERTS_UPDATED_EVENT, handleAlertsUpdated);

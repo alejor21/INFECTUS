@@ -63,22 +63,50 @@ export interface TreatmentFollowup {
   created_at: string;
 }
 
+const PATIENT_SELECT_COLUMNS = [
+  'id',
+  'hospital_id',
+  'patient_code',
+  'full_name',
+  'age',
+  'gender',
+  'admission_date',
+  'discharge_date',
+  'status',
+  'notes',
+  'created_at',
+].join(', ');
+
+const FOLLOWUP_SELECT_COLUMNS = [
+  'id',
+  'patient_id',
+  'hospital_id',
+  'intervention_date',
+  'antibiotic',
+  'dose',
+  'route',
+  'outcome',
+  'notes',
+  'recorded_by',
+  'created_at',
+].join(', ');
+
 export const getPatients = async (hospitalId: string): Promise<Patient[]> => {
   const { data } = await getSupabaseClient()
     .from('patients')
-    .select('*')
+    .select(PATIENT_SELECT_COLUMNS)
     .eq('hospital_id', hospitalId)
     .order('created_at', { ascending: false });
-  return data ?? [];
+  return (data ?? []) as unknown as Patient[];
 };
 
 export const getPatient = async (id: string): Promise<Patient | null> => {
   const { data } = await getSupabaseClient()
     .from('patients')
-    .select('*')
+    .select(PATIENT_SELECT_COLUMNS)
     .eq('id', id)
     .single();
-  return data;
+  return (data ?? null) as unknown as Patient | null;
 };
 
 export const createPatient = async (
@@ -98,10 +126,10 @@ export const deletePatient = async (id: string) => {
 export const getFollowups = async (patientId: string): Promise<TreatmentFollowup[]> => {
   const { data } = await getSupabaseClient()
     .from('treatment_followups')
-    .select('*')
+    .select(FOLLOWUP_SELECT_COLUMNS)
     .eq('patient_id', patientId)
     .order('intervention_date', { ascending: false });
-  return data ?? [];
+  return (data ?? []) as unknown as TreatmentFollowup[];
 };
 
 export const createFollowup = async (

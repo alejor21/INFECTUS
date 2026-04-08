@@ -30,11 +30,24 @@ export interface SavedReport {
   created_at: string;
 }
 
+const SAVED_REPORT_SELECT_COLUMNS = [
+  'id',
+  'hospital_id',
+  'hospital_name',
+  'report_type',
+  'title',
+  'content',
+  'date_range',
+  'records_count',
+  'created_by',
+  'created_at',
+].join(', ');
+
 export async function getSavedReports(hospitalId?: string): Promise<SavedReport[]> {
   const supabase = getSupabaseClient();
   let query = supabase
     .from('saved_reports')
-    .select('*')
+    .select(SAVED_REPORT_SELECT_COLUMNS)
     .order('created_at', { ascending: false });
 
   if (hospitalId) {
@@ -45,7 +58,7 @@ export async function getSavedReports(hospitalId?: string): Promise<SavedReport[
   if (error) {
     return [];
   }
-  return data ?? [];
+  return (data ?? []) as unknown as SavedReport[];
 }
 
 export async function saveReport(
@@ -55,13 +68,13 @@ export async function saveReport(
   const { data, error } = await supabase
     .from('saved_reports')
     .insert(report)
-    .select()
+    .select(SAVED_REPORT_SELECT_COLUMNS)
     .single();
 
   if (error) {
     return null;
   }
-  return data;
+  return (data ?? null) as unknown as SavedReport | null;
 }
 
 export async function deleteReport(id: string): Promise<void> {

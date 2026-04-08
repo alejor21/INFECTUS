@@ -332,7 +332,9 @@ export function Hospitales() {
           is_active: true,
           user_id: user.id,
         })
-        .select('*')
+        .select(
+          'id, name, city, department, beds, contact_name, contact_email, is_active, created_at',
+        )
         .single();
 
       if (error) {

@@ -47,6 +47,27 @@ export const getAlerts = async (hospitalId?: string): Promise<Alert[]> => {
   return (data ?? []) as unknown as Alert[];
 };
 
+export const getUnreadAlertCount = async (
+  hospitalId?: string,
+): Promise<number> => {
+  const supabase = getSupabaseClient();
+  let query = supabase
+    .from('alerts')
+    .select('id', { count: 'exact', head: true })
+    .eq('is_read', false);
+
+  if (hospitalId) {
+    query = query.eq('hospital_id', hospitalId);
+  }
+
+  const { count, error } = await query;
+  if (error) {
+    throw error;
+  }
+
+  return count ?? 0;
+};
+
 export const markAlertRead = async (id: string): Promise<void> => {
   const { error } = await getSupabaseClient()
     .from('alerts')

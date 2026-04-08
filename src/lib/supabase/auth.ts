@@ -2,6 +2,17 @@ import { getSupabaseClient } from './client';
 
 type ProfileRole = 'administrador' | 'infectologo' | 'medico' | 'visor';
 
+const PROFILE_SELECT_COLUMNS = [
+  'id',
+  'full_name',
+  'email',
+  'role',
+  'hospital_name',
+  'avatar_initials',
+  'is_active',
+  'created_at',
+].join(', ');
+
 export const signIn = (email: string, password: string) =>
   getSupabaseClient().auth.signInWithPassword({
     email: email.trim().toLowerCase(),
@@ -106,7 +117,11 @@ export const updateCurrentUserMetadata = (data: Record<string, unknown>) =>
 export const signOut = () => getSupabaseClient().auth.signOut();
 
 export const getProfile = async (userId: string) => {
-  const { data, error } = await getSupabaseClient().from('profiles').select('*').eq('id', userId).single();
+  const { data, error } = await getSupabaseClient()
+    .from('profiles')
+    .select(PROFILE_SELECT_COLUMNS)
+    .eq('id', userId)
+    .single();
   if (error) {
     if (error.code === 'PGRST116') {
       return null;
@@ -115,12 +130,33 @@ export const getProfile = async (userId: string) => {
     throw error;
   }
 
-  return data ?? null;
+  return (data ?? null) as unknown as null | {
+    id: string;
+    full_name: string;
+    email: string;
+    role: ProfileRole;
+    hospital_name: string | null;
+    avatar_initials: string | null;
+    is_active: boolean;
+    created_at: string;
+  };
 };
 
 export const getAllProfiles = async () => {
-  const { data } = await getSupabaseClient().from('profiles').select('*').order('created_at', { ascending: false });
-  return data ?? [];
+  const { data } = await getSupabaseClient()
+    .from('profiles')
+    .select(PROFILE_SELECT_COLUMNS)
+    .order('created_at', { ascending: false });
+  return (data ?? []) as unknown as Array<{
+    id: string;
+    full_name: string;
+    email: string;
+    role: ProfileRole;
+    hospital_name: string | null;
+    avatar_initials: string | null;
+    is_active: boolean;
+    created_at: string;
+  }>;
 };
 
 export const updateProfile = async (

@@ -66,6 +66,29 @@ interface HospitalExcelUploadRow {
   created_at: string;
 }
 
+const HOSPITAL_SELECT_COLUMNS = [
+  'id',
+  'name',
+  'city',
+  'department',
+  'beds',
+  'contact_name',
+  'contact_email',
+  'is_active',
+  'created_at',
+].join(', ');
+
+const HOSPITAL_FILE_SELECT_COLUMNS = [
+  'id',
+  'hospital_id',
+  'file_name',
+  'month',
+  'year',
+  'record_count',
+  'uploaded_at',
+  'uploaded_by',
+].join(', ');
+
 function formatUploadPeriod(periodo: string | null, mes: number | null, anio: number | null): string | null {
   if (periodo) {
     return periodo;
@@ -75,12 +98,19 @@ function formatUploadPeriod(periodo: string | null, mes: number | null, anio: nu
 }
 
 export const getHospitals = async (): Promise<Hospital[]> => {
-  const { data } = await getSupabaseClient().from('hospitals').select('*').order('name');
-  return data ?? [];
+  const { data } = await getSupabaseClient()
+    .from('hospitals')
+    .select(HOSPITAL_SELECT_COLUMNS)
+    .order('name');
+  return (data ?? []) as unknown as Hospital[];
 };
 
 export const createHospital = async (hospital: Omit<Hospital, 'id' | 'created_at'>) => {
-  return getSupabaseClient().from('hospitals').insert(hospital).select().single();
+  return getSupabaseClient()
+    .from('hospitals')
+    .insert(hospital)
+    .select(HOSPITAL_SELECT_COLUMNS)
+    .single();
 };
 
 export const updateHospital = async (id: string, updates: Partial<Hospital>) => {
@@ -98,7 +128,7 @@ export const updateHospitalWithReferences = async (
     .from('hospitals')
     .update(updates)
     .eq('id', hospital.id)
-    .select('*')
+    .select(HOSPITAL_SELECT_COLUMNS)
     .single();
 
   if (error) {
@@ -119,13 +149,13 @@ export const updateHospitalWithReferences = async (
 
     if (profilesUpdate.error || interventionsUpdate.error) {
       return {
-        data: data as Hospital,
+        data: data as unknown as Hospital,
         error: profilesUpdate.error ?? interventionsUpdate.error,
       };
     }
   }
 
-  return { data: data as Hospital, error: null };
+  return { data: data as unknown as Hospital, error: null };
 };
 
 export const deleteHospital = async (id: string) => {
@@ -135,11 +165,11 @@ export const deleteHospital = async (id: string) => {
 export const getHospitalFiles = async (hospitalId: string): Promise<HospitalFile[]> => {
   const { data } = await getSupabaseClient()
     .from('hospital_files')
-    .select('*')
+    .select(HOSPITAL_FILE_SELECT_COLUMNS)
     .eq('hospital_id', hospitalId)
     .order('year', { ascending: false })
     .order('month', { ascending: false });
-  return data ?? [];
+  return (data ?? []) as unknown as HospitalFile[];
 };
 
 export const saveHospitalFile = async (file: Omit<HospitalFile, 'id' | 'uploaded_at'>) => {
