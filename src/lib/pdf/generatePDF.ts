@@ -3,6 +3,12 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import type { InterventionRecord } from '../../types';
 
+type AutoTableDocument = jsPDF & {
+  lastAutoTable?: {
+    finalY: number;
+  };
+};
+
 export interface PDFReportData {
   hospitalName: string;
   dateRangeLabel: string;
@@ -17,7 +23,7 @@ export interface PDFReportData {
 }
 
 export function generatePDFReport(data: PDFReportData): void {
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' }) as AutoTableDocument;
   const pageWidth = doc.internal.pageSize.getWidth();
   const margin = 20;
 
@@ -160,7 +166,7 @@ export function generatePDFReport(data: PDFReportData): void {
     });
 
     if (data.records.length > 100) {
-      const finalY = (doc as any).lastAutoTable.finalY + 4;
+      const finalY = (doc.lastAutoTable?.finalY ?? y) + 4;
       doc.setFontSize(8);
       doc.setTextColor(150, 150, 150);
       doc.text(`* Mostrando 100 de ${data.records.length} registros`, margin, finalY);
@@ -168,7 +174,7 @@ export function generatePDFReport(data: PDFReportData): void {
   }
 
   // --- FOOTER on each page ---
-  const totalPages = (doc as any).internal.getNumberOfPages();
+  const totalPages = doc.getNumberOfPages();
   for (let i = 1; i <= totalPages; i++) {
     doc.setPage(i);
     doc.setFontSize(7);

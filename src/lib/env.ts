@@ -1,12 +1,13 @@
 import { z } from 'zod';
 
 const envSchema = z.object({
-  VITE_SUPABASE_URL: z.string({
-    required_error: 'VITE_SUPABASE_URL is missing. Add it to your .env file.',
-  }).url('VITE_SUPABASE_URL must be a valid URL.'),
-  VITE_SUPABASE_ANON_KEY: z.string({
-    required_error: 'VITE_SUPABASE_ANON_KEY is missing. Add it to your .env file.',
-  }).min(1, 'VITE_SUPABASE_ANON_KEY must not be empty.'),
+  VITE_SUPABASE_URL: z
+    .string()
+    .min(1, 'VITE_SUPABASE_URL is missing. Add it to your .env file.')
+    .url('VITE_SUPABASE_URL must be a valid URL.'),
+  VITE_SUPABASE_ANON_KEY: z
+    .string()
+    .min(1, 'VITE_SUPABASE_ANON_KEY is missing. Add it to your .env file.'),
 });
 
 const parsed = envSchema.safeParse({

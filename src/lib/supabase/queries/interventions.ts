@@ -39,14 +39,14 @@ function toDbRow(record: InterventionRecord): DbRow {
     acciones_med02:             record.accionesMed02,
     dias_terapia_med02:         record.diasTerapiaMed02,
     observaciones:              record.observaciones,
-    resultado_cultivo:          record.resultadoCultivo,
-    tipo_muestra:               record.tipoMuestra,
-    organismo_aislado:          record.organismoAislado,
-    blee:                       record.blee,
-    carbapenemasa:              record.carbapenemasa,
-    mrsa:                       record.mrsa,
-    sensibilidad_vancomicina:   record.sensibilidadVancomicina,
-    sensibilidad_meropenem:     record.sensibilidadMeropenem,
+    resultado_cultivo:          record.resultadoCultivo ?? null,
+    tipo_muestra:               record.tipoMuestra ?? null,
+    organismo_aislado:          record.organismoAislado ?? null,
+    blee:                       record.blee ?? null,
+    carbapenemasa:              record.carbapenemasa ?? null,
+    mrsa:                       record.mrsa ?? null,
+    sensibilidad_vancomicina:   record.sensibilidadVancomicina ?? null,
+    sensibilidad_meropenem:     record.sensibilidadMeropenem ?? null,
   };
 }
 
@@ -115,10 +115,11 @@ export async function upsertInterventions(
   const { error, count } = await supabase
     .from('interventions')
     .upsert(rows, {
+      count: 'exact',
       onConflict: 'admision_cedula,fecha,hospital_name',
       ignoreDuplicates: false,
     })
-    .select('id', { count: 'exact', head: true });
+    .select('id');
 
   if (error) {
     return { inserted: 0, error: error.message };

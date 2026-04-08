@@ -22,6 +22,10 @@ interface EvaluacionMonthRow {
   anio: number | null;
 }
 
+function hasValidMonth(row: EvaluacionMonthRow): row is EvaluacionMonthRow & { mes: number; anio: number } {
+  return row.mes !== null && row.mes > 0 && row.anio !== null && row.anio > 0;
+}
+
 export interface MesData {
   mes: number;
   anio: number;
@@ -75,8 +79,8 @@ export function useDataManagement(hospitalId: string | null | undefined): UseDat
       }
 
       const rows = (data ?? []) as EvaluacionMonthRow[];
-      const validRows = rows.filter((row) => row.mes && row.mes > 0 && row.anio && row.anio > 0);
-      const invalidRows = rows.filter((row) => !row.mes || row.mes === 0 || !row.anio || row.anio === 0);
+      const validRows = rows.filter(hasValidMonth);
+      const invalidRows = rows.filter((row) => !hasValidMonth(row));
       const monthMap = new Map<string, MesData>();
 
       for (const row of validRows) {

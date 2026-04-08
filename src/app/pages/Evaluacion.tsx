@@ -772,6 +772,7 @@ function ListContent({
   onCancelDelete,
   onDelete,
 }: ListContentProps) {
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [levelFilter, setLevelFilter] =
     useState<'todos' | 'avanzado' | 'basico' | 'inadecuado'>('todos');

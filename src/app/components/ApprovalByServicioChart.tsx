@@ -59,7 +59,6 @@ export function ApprovalByServicioChart({ data, loading }: ApprovalByServicioCha
                   borderRadius: '8px',
                   fontSize: '12px'
                 }}
-                className="dark:bg-gray-800 dark:border-gray-600"
               />
               <Legend 
                 wrapperStyle={{ fontSize: '12px' }}

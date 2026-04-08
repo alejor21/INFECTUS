@@ -4,26 +4,26 @@ import type { ConductaChartDatum } from '../../../../hooks/useProaCharts';
 import { ProaChartCard } from './ProaChartCard';
 
 interface ConductasChartProps {
-  cardId: string;
-  title: string;
-  subtitle: string;
+  cardId?: string;
+  title?: string;
+  subtitle?: string;
   data: ConductaChartDatum[];
-  analysis: string[];
-  isLoading: boolean;
-  onExport: () => void;
+  analysis?: string[];
+  isLoading?: boolean;
+  onExport?: () => void;
   chartHeightClassName?: string;
   showExportButton?: boolean;
   showAnalysis?: boolean;
 }
 
 export function ConductasChart({
-  cardId,
-  title,
-  subtitle,
+  cardId = 'conductas-chart',
+  title = 'Conductas recomendadas',
+  subtitle = 'Frecuencia de acciones clinicas sugeridas',
   data,
-  analysis,
-  isLoading,
-  onExport,
+  analysis = [],
+  isLoading = false,
+  onExport = () => {},
   chartHeightClassName,
   showExportButton,
   showAnalysis,

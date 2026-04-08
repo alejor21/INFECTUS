@@ -37,7 +37,6 @@ export function MonthlyTrendChart({ data }: MonthlyTrendChartProps) {
                 borderRadius: '8px',
                 fontSize: '12px'
               }}
-              className="dark:bg-gray-800 dark:border-gray-600"
             />
             <Legend
               wrapperStyle={{ fontSize: '12px' }}

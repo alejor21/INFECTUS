@@ -5,13 +5,13 @@ import { formatPct } from '../../../../lib/analytics/proaCommittee';
 import { ProaChartCard } from './ProaChartCard';
 
 interface DistribucionServicioChartProps {
-  cardId: string;
-  title: string;
-  subtitle: string;
+  cardId?: string;
+  title?: string;
+  subtitle?: string;
   data: ServicioChartDatum[];
-  analysis: string[];
-  isLoading: boolean;
-  onExport: () => void;
+  analysis?: string[];
+  isLoading?: boolean;
+  onExport?: () => void;
   chartHeightClassName?: string;
   showExportButton?: boolean;
   showAnalysis?: boolean;
@@ -48,13 +48,13 @@ function renderPercentageLabel({
 }
 
 export function DistribucionServicioChart({
-  cardId,
-  title,
-  subtitle,
+  cardId = 'distribucion-servicio-chart',
+  title = 'Distribucion por servicio',
+  subtitle = 'Participacion de cada servicio en las evaluaciones',
   data,
-  analysis,
-  isLoading,
-  onExport,
+  analysis = [],
+  isLoading = false,
+  onExport = () => {},
   chartHeightClassName,
   showExportButton,
   showAnalysis,

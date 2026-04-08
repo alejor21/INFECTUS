@@ -28,6 +28,10 @@ function addSlideTitle(slide: PptxGenJS.Slide, title: string): void {
   });
 }
 
+function toTableRow(values: string[]) {
+  return values.map((value) => ({ text: value }));
+}
+
 export async function exportPowerPoint(input: PDFReportInput): Promise<void> {
   try {
     const pptx = new PptxGenJS();
@@ -135,8 +139,8 @@ export async function exportPowerPoint(input: PDFReportInput): Promise<void> {
       addSlideTitle(slide5, `Comparativa: ${input.mes} vs ${input.mesComparar}`);
       slide5.addTable(
         [
-          ['Indicador', input.mes, input.mesComparar, 'Diferencia'],
-          ...input.tablaComparativa.map((row) => [row.indicador, row.mes1, row.mes2, row.diff]),
+          toTableRow(['Indicador', input.mes, input.mesComparar, 'Diferencia']),
+          ...input.tablaComparativa.map((row) => toTableRow([row.indicador, row.mes1, row.mes2, row.diff])),
         ],
         {
           x: 0.5,
@@ -146,10 +150,9 @@ export async function exportPowerPoint(input: PDFReportInput): Promise<void> {
           fontSize: 9,
           color: DARK,
           border: { type: 'solid', color: 'DCD9D5', pt: 0.5 },
-          fill: LIGHT,
+          fill: { color: LIGHT },
           bold: false,
           rowH: 0.45,
-          autoFit: false,
           colW: [3.6, 2.6, 2.6, 3.2],
         },
       );

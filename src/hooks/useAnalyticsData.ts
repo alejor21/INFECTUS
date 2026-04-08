@@ -158,7 +158,7 @@ export function useAnalyticsData(
         );
         setMesesDisponibles(orderedMonths);
 
-        const evaluaciones = (evaluacionesResult.data ?? []) as EvaluacionAnalyticsRow[];
+        const evaluaciones = (evaluacionesResult.data ?? []) as unknown as EvaluacionAnalyticsRow[];
         if (evaluaciones.length === 0) {
           setData(null);
           return;

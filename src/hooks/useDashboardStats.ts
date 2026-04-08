@@ -150,7 +150,7 @@ export function useDashboardStats(
           return;
         }
 
-        const evaluaciones = ((data ?? []) as EvaluacionDashboardRow[]);
+        const evaluaciones = (data ?? []) as unknown as EvaluacionDashboardRow[];
         const recentEvals = ((recentRows ?? []) as RecentEval[]);
 
         if (evaluaciones.length === 0) {

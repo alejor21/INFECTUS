@@ -19,7 +19,7 @@ export interface ParseResult {
 
 type ImportField = keyof Omit<
   InterventionRecord,
-  'id' | 'hospitalName' | 'createdAt'
+  'id' | 'hospitalId' | 'hospitalName' | 'createdAt'
 >;
 
 const CRITICAL_FIELDS: ImportField[] = [

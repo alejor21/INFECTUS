@@ -202,7 +202,7 @@ export function ProaReportModal({
       },
       {
         label: 'Terapia empirica',
-        value: `${pct(scopedRecords.filter((record) => isYes(record.terapiaEmpirica)).length, scopedRecords.length)}%`,
+        value: `${pct(scopedRecords.filter((record) => isYes(record.terapiaEmpricaApropiada)).length, scopedRecords.length)}%`,
       },
     ],
     [adherenciaData.adheridos, adherenciaData.total, scopedRecords],

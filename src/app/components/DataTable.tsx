@@ -34,8 +34,7 @@ export function DataTable({ records }: Props) {
             <input
               type="text"
               placeholder="Buscar por servicio, antibiótico..."
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-opacity-50"
-              style={{ focusRing: '#0F8B8D' }}
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50"
             />
           </div>
 

@@ -67,7 +67,6 @@ export function ServicioDistributionChart({ data, loading }: ServicioDistributio
                   borderRadius: '8px',
                   fontSize: '12px'
                 }}
-                className="dark:bg-gray-800 dark:border-gray-600"
                 formatter={(value: number) => [`${value} evaluaciones`, 'Cantidad']}
               />
               <Bar dataKey="value" fill="#3B82F6" radius={[0, 8, 8, 0]} />

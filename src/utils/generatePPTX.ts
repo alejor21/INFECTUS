@@ -68,7 +68,7 @@ function addTextBlock(slide: pptxgen.Slide, lines: string[], startY: number): vo
       fontFace: 'Calibri',
       fontSize: 11,
       color: BODY_COLOR,
-      valign: 'mid',
+      valign: 'middle',
       margin: 0,
     });
     currentY += 0.32;
@@ -87,7 +87,7 @@ function addTitlePanel(slide: pptxgen.Slide, title: string, heading: string, lin
     bold: true,
     color: TITLE_COLOR,
     margin: 0,
-    valign: 'mid',
+    valign: 'middle',
   });
   slide.addShape(pptxgen.ShapeType.line, {
     x: 0.55,
@@ -170,7 +170,6 @@ function addBarChart(slide: pptxgen.Slide, data: ConductaChartDatum[]): void {
     valAxisTitle: 'Numero de casos',
     valAxisTitleFontFace: 'Calibri',
     valAxisTitleFontSize: 9,
-    showCatName: true,
     showValAxisTitle: true,
     showCatAxisTitle: false,
     catAxisLabelRotate: 0,
@@ -247,7 +246,6 @@ export async function generateProaPPTX(params: PPTXParams): Promise<void> {
     pptx.company = 'INFECTUS';
     pptx.subject = 'Reporte Comite PROA';
     pptx.title = `PROA ${params.hospitalName} ${params.period}`;
-    pptx.lang = 'es-CO';
 
     const portada = pptx.addSlide();
     addSlideChrome(portada);
@@ -261,7 +259,7 @@ export async function generateProaPPTX(params: PPTXParams): Promise<void> {
       bold: true,
       color: TITLE_COLOR,
       align: 'center',
-      valign: 'mid',
+      valign: 'middle',
       margin: 0,
     });
     portada.addText(params.period, {
@@ -284,7 +282,7 @@ export async function generateProaPPTX(params: PPTXParams): Promise<void> {
       fontSize: 11,
       color: BODY_COLOR,
       align: 'center',
-      valign: 'mid',
+      valign: 'middle',
       margin: 0,
     });
     portada.addText(params.hospitalName, {

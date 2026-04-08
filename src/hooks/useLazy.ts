@@ -7,7 +7,9 @@ export function useLazy<P extends object>(
   importFn: () => Promise<{ default: ComponentType<P> }>,
   displayName: string
 ) {
-  const Component = reactLazy(importFn);
+  const Component = reactLazy(importFn) as React.LazyExoticComponent<ComponentType<P>> & {
+    displayName?: string;
+  };
   Component.displayName = `Lazy(${displayName})`;
   return Component;
 }

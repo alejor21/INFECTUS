@@ -1,5 +1,5 @@
 import { X, Calendar, CheckCircle2, XCircle } from 'lucide-react';
-import type { InterventionRecord } from '../types';
+import type { InterventionRecord } from '../../types';
 
 interface DayDetailModalProps {
   date: string;

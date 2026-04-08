@@ -332,28 +332,24 @@ export function Dashboard() {
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <TipoIntervencionCommitteeChart
               data={stats?.tipoData ?? []}
-              hospitalName={selectedHospitalObj?.name ?? 'Hospital'}
               showAnalysis={false}
               showExportButton={false}
               chartHeightClassName="h-56"
             />
             <DistribucionServicioChart
               data={stats?.servicioData ?? []}
-              hospitalName={selectedHospitalObj?.name ?? 'Hospital'}
               showAnalysis={false}
               showExportButton={false}
               chartHeightClassName="h-56"
             />
             <ConductasChart
               data={stats?.conductasData ?? []}
-              hospitalName={selectedHospitalObj?.name ?? 'Hospital'}
               showAnalysis={false}
               showExportButton={false}
               chartHeightClassName="h-56"
             />
             <AdherenciaChart
               data={stats?.adherenciaData ?? { adheridos: 0, noAdheridos: 0, total: 0 }}
-              hospitalName={selectedHospitalObj?.name ?? 'Hospital'}
               showAnalysis={false}
               showExportButton={false}
               chartHeightClassName="h-56"

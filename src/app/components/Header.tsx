@@ -156,7 +156,11 @@ export function Header({ onMenuOpen, onStartTour }: HeaderProps) {
                   {index > 0 ? <ChevronRight className="h-4 w-4 text-gray-400" /> : null}
                   {item.path && index < breadcrumbItems.length - 1 ? (
                     <button
-                      onClick={() => navigate(item.path)}
+                      onClick={() => {
+                        if (item.path) {
+                          void navigate(item.path);
+                        }
+                      }}
                       className="text-teal-600 underline transition-colors hover:text-teal-700 dark:text-teal-400 dark:hover:text-teal-300"
                     >
                       {item.label}

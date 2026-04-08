@@ -63,7 +63,6 @@ export function TipoIntervencionChart({ data, loading }: TipoIntervencionChartPr
                   borderRadius: '8px',
                   fontSize: '12px'
                 }}
-                className="dark:bg-gray-800 dark:border-gray-600"
                 formatter={(value: number) => [`${value} registros`, 'Cantidad']}
               />
               <Legend 

@@ -5,13 +5,13 @@ import { formatPct } from '../../../../lib/analytics/proaCommittee';
 import type { AdherenciaChartData } from '../../../../hooks/useProaCharts';
 
 interface AdherenciaChartProps {
-  cardId: string;
-  title: string;
-  subtitle: string;
+  cardId?: string;
+  title?: string;
+  subtitle?: string;
   data: AdherenciaChartData;
-  analysis: string[];
-  isLoading: boolean;
-  onExport: () => void;
+  analysis?: string[];
+  isLoading?: boolean;
+  onExport?: () => void;
   chartHeightClassName?: string;
   showExportButton?: boolean;
   showAnalysis?: boolean;
@@ -46,13 +46,13 @@ function renderPercentageLabel({
 }
 
 export function AdherenciaChart({
-  cardId,
-  title,
-  subtitle,
+  cardId = 'adherencia-chart',
+  title = 'Adherencia a recomendaciones',
+  subtitle = 'Proporcion de casos adheridos y no adheridos',
   data,
-  analysis,
-  isLoading,
-  onExport,
+  analysis = [],
+  isLoading = false,
+  onExport = () => {},
   chartHeightClassName,
   showExportButton,
   showAnalysis,

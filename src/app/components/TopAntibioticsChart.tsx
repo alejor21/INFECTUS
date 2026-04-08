@@ -42,7 +42,6 @@ export function TopAntibioticsChart({ data }: TopAntibioticsChartProps) {
                 borderRadius: '8px',
                 fontSize: '12px'
               }}
-              className="dark:bg-gray-800 dark:border-gray-600"
             />
             <Bar dataKey="value" fill="#0F8B8D" radius={[0, 8, 8, 0]} />
           </BarChart>

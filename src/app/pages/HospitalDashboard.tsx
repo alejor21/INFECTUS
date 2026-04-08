@@ -459,7 +459,10 @@ export function HospitalDashboard() {
     ]);
 
     setHospital(hosp as HospitalInfo | null);
-    const metricRows = buildHospitalMonthlyMetrics(hospitalId, (evaluationData ?? []) as EvaluationMetricRow[]);
+    const metricRows = buildHospitalMonthlyMetrics(
+      hospitalId,
+      (evaluationData ?? []) as unknown as EvaluationMetricRow[],
+    );
     setMonths(metricRows);
     const latestUpload = ((uploadData ?? []) as HospitalExcelUpload[])[0] ?? null;
     setUpload(latestUpload);

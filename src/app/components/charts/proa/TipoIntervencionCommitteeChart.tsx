@@ -5,13 +5,13 @@ import { formatPct } from '../../../../lib/analytics/proaCommittee';
 import { ProaChartCard } from './ProaChartCard';
 
 interface TipoIntervencionCommitteeChartProps {
-  cardId: string;
-  title: string;
-  subtitle: string;
+  cardId?: string;
+  title?: string;
+  subtitle?: string;
   data: TipoIntervencionChartDatum[];
-  analysis: string[];
-  isLoading: boolean;
-  onExport: () => void;
+  analysis?: string[];
+  isLoading?: boolean;
+  onExport?: () => void;
   chartHeightClassName?: string;
   showExportButton?: boolean;
   showAnalysis?: boolean;
@@ -52,13 +52,13 @@ function renderPercentageLabel({
 }
 
 export function TipoIntervencionCommitteeChart({
-  cardId,
-  title,
-  subtitle,
+  cardId = 'tipo-intervencion-chart',
+  title = 'Tipo de intervenciones',
+  subtitle = 'Distribucion de casos por categoria',
   data,
-  analysis,
-  isLoading,
-  onExport,
+  analysis = [],
+  isLoading = false,
+  onExport = () => {},
   chartHeightClassName,
   showExportButton,
   showAnalysis,

@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import type { InterventionRecord } from '../types';
+import type { InterventionRecord } from '../../types';
 
 interface CalendarAnalyticsProps {
   records: InterventionRecord[];

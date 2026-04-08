@@ -206,7 +206,7 @@ export function Reportes() {
 
     const question = chatInput.trim();
     setChatInput('');
-    setChatHistory((prev) => [...prev, { role: 'user', content: question }].slice(-10));
+    setChatHistory((prev) => [...prev, { role: 'user' as const, content: question }].slice(-10));
 
     try {
       const answer = await chat(question);
@@ -214,7 +214,7 @@ export function Reportes() {
         return;
       }
 
-      setChatHistory((prev) => [...prev, { role: 'assistant', content: answer }].slice(-10));
+      setChatHistory((prev) => [...prev, { role: 'assistant' as const, content: answer }].slice(-10));
     } catch {
       toast.error('No fue posible consultar al asistente.');
     }

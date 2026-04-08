@@ -93,7 +93,7 @@ export function useEvaluaciones(hospitalId: string | null) {
       .eq('evaluacion_id', evaluacionId);
     if (error) throw error;
     const result: Record<string, ComplianceValueDB> = {};
-    (data ?? []).forEach((r: EvaluacionRespuesta) => {
+    (data ?? []).forEach((r: Pick<EvaluacionRespuesta, 'item_key' | 'value'>) => {
       result[r.item_key] = r.value;
     });
     return result;

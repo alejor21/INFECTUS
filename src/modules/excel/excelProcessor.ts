@@ -1112,7 +1112,15 @@ export async function processAndSaveExcel(
 
     monthlyData.sort((left, right) => left.month.localeCompare(right.month));
     const monthsFound = monthlyData.map((item) => item.month);
-    const latestMonth = monthlyData[monthlyData.length - 1] ?? mesesDetectados[0] ?? null;
+    const latestMonthlyData = monthlyData[monthlyData.length - 1] ?? null;
+    const latestDetectedMonth = mesesDetectados[0] ?? null;
+    const uploadPeriodo = latestMonthlyData?.monthLabel ?? latestDetectedMonth?.label ?? null;
+    const uploadMes = latestMonthlyData
+      ? Number.parseInt(latestMonthlyData.month.split('-')[1], 10)
+      : latestDetectedMonth?.mes ?? null;
+    const uploadAnio = latestMonthlyData
+      ? Number.parseInt(latestMonthlyData.month.split('-')[0], 10)
+      : latestDetectedMonth?.anio ?? null;
 
     const { data: upload, error: uploadError } = await supabase
       .from('hospital_excel_uploads')
@@ -1120,9 +1128,9 @@ export async function processAndSaveExcel(
         hospital_id: hospitalId,
         user_id: uploadedBy,
         filename: file.name,
-        periodo: latestMonth ? ('monthLabel' in latestMonth ? latestMonth.monthLabel : latestMonth.label) : null,
-        mes: latestMonth ? ('month' in latestMonth ? Number.parseInt(latestMonth.month.split('-')[1], 10) : latestMonth.mes) : null,
-        anio: latestMonth ? ('month' in latestMonth ? Number.parseInt(latestMonth.month.split('-')[0], 10) : latestMonth.anio) : null,
+        periodo: uploadPeriodo,
+        mes: uploadMes,
+        anio: uploadAnio,
         total_filas: parsedRows.length,
         filas_validas: filasInsertadas,
         filas_error: errores.length,
