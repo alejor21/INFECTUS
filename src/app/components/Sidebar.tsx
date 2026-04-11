@@ -6,6 +6,7 @@ import {
   Building2,
   ChevronDown,
   ClipboardCheck,
+  ClipboardList,
   FileText,
   GitCompare,
   Globe,
@@ -108,6 +109,12 @@ export function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
           label: 'Comparativa',
           path: '/comparativa',
           title: 'Comparar metricas',
+        },
+        {
+          icon: ClipboardList,
+          label: 'PROA',
+          path: '/plantilla-proa',
+          title: 'Registro y plantilla PROA',
         },
         {
           icon: FileText,

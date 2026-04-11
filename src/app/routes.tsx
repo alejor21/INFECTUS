@@ -28,6 +28,7 @@ const HospitalDashboard = wrap(lazy(() => import('./pages/HospitalDashboard').th
 const Comparativa = wrap(lazy(() => import('./pages/Comparativa').then((module) => ({ default: module.Comparativa }))));
 const Alertas = wrap(lazy(() => import('./pages/Alertas').then((module) => ({ default: module.Alertas }))));
 const CalculadoraDDD = wrap(lazy(() => import('./pages/CalculadoraDDD').then((module) => ({ default: module.CalculadoraDDD }))));
+const PlantillaPROA = wrap(lazy(() => import('./pages/PlantillaPROA').then((module) => ({ default: module.PlantillaPROA }))));
 const Pacientes = wrap(lazy(() => import('./pages/Pacientes').then((module) => ({ default: module.Pacientes }))));
 const Evaluacion = wrap(lazy(() => import('./pages/Evaluacion').then((module) => ({ default: module.Evaluacion }))));
 const EvaluacionInstituciones = wrap(lazy(() => import('../modules/evaluacion/pages/EvaluacionInstituciones').then((module) => ({ default: module.EvaluacionInstituciones }))));
@@ -94,6 +95,7 @@ export const router = createBrowserRouter([
           { path: 'pacientes', Component: Pacientes },
           { path: 'comparativa', Component: Comparativa },
           { path: 'calculadora-ddd', Component: CalculadoraDDD },
+          { path: 'plantilla-proa', Component: PlantillaPROA },
           { path: '*', element: <Navigate to="/dashboard" replace /> },
         ],
       },
